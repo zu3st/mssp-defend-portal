@@ -1,0 +1,54 @@
+import { fail, redirect } from '@sveltejs/kit';
+import { app } from '#lib/server/app.ts';
+import { encodeSession, SESSION_COOKIE, verifyPassword } from '#lib/server/auth.ts';
+import type { Actions, PageServerLoad } from './$types';
+
+/** Only same-site relative paths are accepted as post-login targets. */
+function safeNext(v: string | null): string {
+	return v && v.startsWith('/') && !v.startsWith('//') && !v.startsWith('/\\') ? v : '/';
+}
+
+export const load: PageServerLoad = ({ locals, url }) => {
+	if (locals.user) redirect(303, safeNext(url.searchParams.get('next')));
+	return {};
+};
+
+export const actions: Actions = {
+	default: async ({ request, cookies, url, getClientAddress }) => {
+		const { config, limiter } = app();
+		const form = await request.formData();
+		const username = String(form.get('username') ?? '')
+			.trim()
+			.slice(0, 100);
+		const password = String(form.get('password') ?? '').slice(0, 256);
+		const key = `${getClientAddress()}|${username.toLowerCase()}`;
+
+		if (!limiter.allow(key)) {
+			return fail(429, {
+				username,
+				message: 'Too many attempts. Please wait a few minutes and try again.'
+			});
+		}
+		if (!username || !password || !verifyPassword(password, config.auth.users.get(username))) {
+			limiter.fail(key);
+			console.warn(JSON.stringify({ level: 'warn', msg: 'login failed', user: username }));
+			return fail(400, { username, message: 'Invalid username or password.' });
+		}
+		limiter.reset(key);
+
+		const exp = Math.floor(Date.now() / 1000) + config.auth.sessionTtlSeconds;
+		cookies.set(
+			SESSION_COOKIE,
+			encodeSession({ user: username, tenant: config.tenant.id, exp }, config.auth.sessionSecret),
+			{
+				path: '/',
+				httpOnly: true,
+				sameSite: 'strict',
+				secure: config.auth.secureCookies,
+				maxAge: config.auth.sessionTtlSeconds
+			}
+		);
+		console.info(JSON.stringify({ level: 'info', msg: 'login', user: username }));
+		redirect(303, safeNext(url.searchParams.get('next')));
+	}
+};

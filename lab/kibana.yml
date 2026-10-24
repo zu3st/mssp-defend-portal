@@ -1,0 +1,32 @@
+# Lab Kibana config. Fleet is preconfigured so Fleet Server can enrol itself.
+server.host: '0.0.0.0'
+server.name: mssp-lab-kibana
+telemetry.optIn: false
+telemetry.allowChangingOptInStatus: false
+
+xpack.fleet.agents.fleet_server.hosts: ['http://fleet-server:8220']
+xpack.fleet.outputs:
+  - id: lab-es
+    name: lab-es
+    type: elasticsearch
+    hosts: ['http://elasticsearch:9200']
+    is_default: true
+    is_default_monitoring: true
+xpack.fleet.packages:
+  - name: fleet_server
+    version: latest
+  - name: system
+    version: latest
+  - name: endpoint
+    version: latest
+xpack.fleet.agentPolicies:
+  - name: Fleet Server (lab)
+    id: fleet-server-policy
+    namespace: default
+    is_default_fleet_server: true
+    monitoring_enabled: []
+    package_policies:
+      - name: fleet_server-1
+        id: fleet-server-1
+        package:
+          name: fleet_server

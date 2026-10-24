@@ -1,0 +1,44 @@
+# Overlay: connect the portals to a real Elastic stack instead of mock data.
+#
+#   docker compose -f compose.yaml -f compose.elastic.yaml up -d --build
+#
+# Defaults target the project's lab stack (lab/compose.yaml, network
+# mssp-lab_default). Prerequisite: secrets/<tenant>/elastic_api_key, a
+# tenant-specific read-only API key (encoded form); lab/setup.mjs creates them.
+#
+# For a TLS stack (e.g. ECK), override the URLs and add the CA:
+#   NODE_EXTRA_CA_CERTS: /run/secrets/ca_crt   + a ca_crt secret per service.
+
+x-elastic-env: &elastic-env
+  DATA_SOURCE: elastic
+  ELASTICSEARCH_URL: ${LAB_ELASTICSEARCH_URL:-http://elasticsearch:9200}
+  KIBANA_URL: ${LAB_KIBANA_URL:-http://kibana:5601}
+  ELASTIC_API_KEY_FILE: /run/secrets/elastic_api_key
+
+services:
+  portal-acme:
+    environment:
+      <<: *elastic-env
+    networks: [default, elastic]
+    secrets:
+      - source: acme_elastic_api_key
+        target: elastic_api_key
+
+  portal-globex:
+    environment:
+      <<: *elastic-env
+    networks: [default, elastic]
+    secrets:
+      - source: globex_elastic_api_key
+        target: elastic_api_key
+
+networks:
+  elastic:
+    external: true
+    name: ${LAB_ELASTIC_NETWORK:-mssp-lab_default}
+
+secrets:
+  acme_elastic_api_key:
+    file: ./secrets/acme/elastic_api_key
+  globex_elastic_api_key:
+    file: ./secrets/globex/elastic_api_key

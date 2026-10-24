@@ -1,0 +1,71 @@
+# MSSP Defend portal – lab deployment.
+#
+# One container per customer. Each container is bound to exactly one tenant
+# by its environment and (in elastic mode) its own tenant-specific API key.
+#
+#   scripts/lab-init.sh            # once: generate session secrets + demo users
+#   docker compose up -d --build   # mock data (default)
+#
+# To use the real lab stack instead of mock data, see compose.elastic.yaml.
+
+x-portal: &portal
+  build: .
+  image: mssp-defend-portal:dev
+  restart: unless-stopped
+  read_only: true
+  tmpfs: [/tmp]
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+  environment: &portal-env
+    DATA_SOURCE: mock
+    SESSION_SECRET_FILE: /run/secrets/session_secret
+    PORTAL_USERS_FILE: /run/secrets/users
+    # Lab runs over plain HTTP; set to true (default) behind TLS.
+    COOKIE_SECURE: 'false'
+
+services:
+  portal-acme:
+    <<: *portal
+    container_name: portal-acme
+    ports: ['127.0.0.1:3101:3000']
+    environment:
+      <<: *portal-env
+      ORIGIN: http://localhost:3101
+      TENANT_ID: acme
+      TENANT_NAME: Acme Corp
+      KIBANA_SPACE_ID: acme
+      TENANT_AGENT_POLICY_IDS: acme-workstations,acme-servers
+      TENANT_NAMESPACES: acme
+    secrets:
+      - source: acme_session_secret
+        target: session_secret
+      - source: acme_users
+        target: users
+
+  portal-globex:
+    <<: *portal
+    container_name: portal-globex
+    ports: ['127.0.0.1:3102:3000']
+    environment:
+      <<: *portal-env
+      ORIGIN: http://localhost:3102
+      TENANT_ID: globex
+      TENANT_NAME: Globex Inc
+      KIBANA_SPACE_ID: globex
+      TENANT_AGENT_POLICY_IDS: globex-endpoints
+      TENANT_NAMESPACES: globex
+    secrets:
+      - source: globex_session_secret
+        target: session_secret
+      - source: globex_users
+        target: users
+
+secrets:
+  acme_session_secret:
+    file: ./secrets/acme/session_secret
+  acme_users:
+    file: ./secrets/acme/users.json
+  globex_session_secret:
+    file: ./secrets/globex/session_secret
+  globex_users:
+    file: ./secrets/globex/users.json
