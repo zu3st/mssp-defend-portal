@@ -1,11 +1,8 @@
 # MSSP Defend Portal
 
-A managed security service provider (MSSP) that runs Elastic Defend for its customers
-usually keeps Kibana to itself: one cluster holds every customer's data, and Kibana is
-built for analysts. Customers still want to see how their endpoints are protected and what
-was detected on them.
-
-MSSP Defend Portal gives each customer a read-only web portal for that:
+MSSP Defend Portal gives each customer of a shared Elastic cluster a read-only web portal
+for their Fleet agents and Elastic Defend detections. Each portal serves one tenant, that
+is one Kibana space and its data stream namespaces, and has three pages:
 
 - **Overview:** agent health, Elastic Defend policy status, active detections, threats
   prevented and detections by severity, with the agents that need attention.
@@ -14,8 +11,6 @@ MSSP Defend Portal gives each customer a read-only web portal for that:
   modelled on Kibana's alert flyout.
 - **Agents:** a Fleet-style agent list and agent page with Elastic Defend policy status,
   network isolation, integration health and the agent's detections.
-
-The portal never changes anything in Elastic, and the browser talks only to the portal.
 
 | Overview                                 | Detection details                            |
 | ---------------------------------------- | -------------------------------------------- |
@@ -27,17 +22,11 @@ The portal never changes anything in Elastic, and the browser talks only to the 
 
 ## How customers are kept apart
 
-- **One container per customer.** Its configuration binds it to that customer's Kibana
-  space, agent policies and data stream namespaces. Without them it refuses to start.
-- **One API key per customer.** Each container uses its own read-only Elastic API key,
-  limited to that customer's space and data, with document-level security in
-  Elasticsearch.
-- **Every query is scoped, every result is checked.** The portal filters by space,
-  namespace and agent policy, and checks each document again before using it. A document
-  of another customer is refused and logged as `TENANT SCOPE VIOLATION`.
-- **No raw documents.** Only allowlisted fields, normalized on the server, reach the
-  browser.
-
+Each customer gets its own container, configured with that customer's Kibana space, agent
+policies and data stream namespaces, and its own read-only API key. Elasticsearch limits
+the key to the customer's data with document-level security. The portal also filters its
+queries by space, namespace and agent policy, rejects documents from other customers, and
+passes on only the fields it shows, such as the highlighted fields of each detection type.
 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) describes the design in detail.
 
 ## Requirements
@@ -86,7 +75,7 @@ The steps use a customer `contoso` with the space, namespace and agent policy id
    docker build -t mssp-defend-portal .
    ```
 
-   The build runs the type check and the tests, so a failing build produces no image.
+   The build also runs the type check and the tests.
 
 5. **Run the customer's container:**
 
@@ -108,8 +97,9 @@ The steps use a customer `contoso` with the space, namespace and agent policy id
 
 6. **Publish it over TLS** through a reverse proxy or ingress at the `ORIGIN` address.
 
-Local users are meant for the lab. For production, put single sign-on in front and work
-through the checklist in [docs/PRODUCTION.md](docs/PRODUCTION.md).
+Sign-in uses the local users file; single sign-on is not built in yet.
+[docs/PRODUCTION.md](docs/PRODUCTION.md) describes the options and what else to check
+before going live.
 
 ## Configuration
 
@@ -122,37 +112,18 @@ through the checklist in [docs/PRODUCTION.md](docs/PRODUCTION.md).
 | `TENANT_NAMESPACES`                  | yes         | Data stream namespaces of this customer's policies                                                      |
 | `ALERTS_INDEX`                       | –           | Default `.alerts-security.alerts-<space>`                                                               |
 | `DATA_SOURCE`                        | –           | `mock` (default) or `elastic`                                                                           |
-| `ELASTICSEARCH_URL`, `KIBANA_URL`    | elastic     | Backend URLs, reachable only from the container                                                         |
+| `ELASTICSEARCH_URL`, `KIBANA_URL`    | elastic     | Elasticsearch and Kibana URLs as the container reaches them                                             |
 | `ELASTIC_API_KEY[_FILE]`             | elastic     | Tenant-specific read-only API key (encoded form)                                                        |
 | `ELASTIC_TIMEOUT_MS`                 | –           | Timeout of each Elastic request, default 10000                                                          |
 | `NODE_EXTRA_CA_CERTS`                | –           | CA bundle for the Elastic TLS certificates                                                              |
 | `SESSION_SECRET[_FILE]`              | yes         | At least 32 characters; unique per container                                                            |
 | `PORTAL_USERS_FILE` / `PORTAL_USERS` | yes         | JSON `{user: scryptHash}` / `user:hash,…`                                                               |
 | `ORIGIN`                             | recommended | Public origin(s), comma-separated, e.g. `https://portal.acme.example`; POSTs must come from one of them |
-| `COOKIE_SECURE`                      | –           | `true` by default; `false` only for plain-HTTP labs                                                     |
+| `COOKIE_SECURE`                      | –           | `true` by default; `false` only for local testing over plain HTTP                                       |
 | `SESSION_TTL_SECONDS`                | –           | Default 8 hours                                                                                         |
 
-`/healthz` reports that the portal runs and `/readyz` that it reaches Kibana. Neither
-needs a login or shows customer data.
-
-## Using the portal
-
-- **Time range:** Overview, Detections and an agent's detections share one date picker, as
-  in Kibana, with quick
-  selection, commonly used ranges and a custom date range. The choice carries across views
-  for the browser session. _Today_ and _This week_ follow the browser's time zone.
-- **Refresh:** the date picker's _Refresh every_ reloads data at an interval of your choice,
-  and pauses while a detection is open. The agent pages refresh every 30 seconds, as Fleet
-  does.
-- **Theme:** light, dark or the system setting.
-
-## Status
-
-Verified against an Elastic 9.5.5 lab with two customers, real Fleet agents and the real
-Endpoint Security rule, and with Elastic Defend on a Windows Server 2025 VM: policy
-response, isolation, malware, ransomware and behavior prevention alerts, and custom rules.
-Memory threat alerts and a Windows client remain to be verified; see
-[docs/ELASTIC.md](docs/ELASTIC.md#still-to-verify).
+`/healthz` reports that the portal runs and `/readyz` that it reaches Kibana; both work
+without a login, for health probes.
 
 ## Trying it out
 

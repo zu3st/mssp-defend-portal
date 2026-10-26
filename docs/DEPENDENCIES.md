@@ -28,22 +28,21 @@ the **runtime image contains no `node_modules`**.
 
 - **`@elastic/elasticsearch`**: the portal needs only `_search`. Node's built-in `fetch`
   plus a read-only route allowlist avoids coupling the client major version to the cluster's
-  major version and adds no transitive dependencies.
-  It can be reintroduced if bulk or scroll APIs are ever needed.
+  major version and adds no transitive dependencies. It fits again if bulk or scroll APIs
+  are needed.
 - **shadcn-svelte / bits-ui / tailwind-variants / tailwind-merge / clsx**: the few
-  components needed (badge, table, dropdown filter, date picker, side sheet) are written by hand in the
-  same style. They use native `<dialog>` and `<details>`, which handle focus and Escape and
-  work without JavaScript. This avoids about 4 packages, and SvelteKit 3's `#lib` alias was
-  not yet supported by the shadcn CLI.
+  components needed (badge, table, dropdown filter, date picker, side sheet) are written by
+  hand in the same style, on native `<dialog>` and `<details>`, which handle focus and
+  Escape and work without JavaScript. This avoids about four packages.
 - **TanStack Table**: sorting, filtering and pagination all happen server-side and are
   driven by URL parameters, so a client table engine would only provide column definitions.
   It is worth adopting if client-side column visibility or resizing is wanted.
-- **Auth libraries**: lab auth uses `node:crypto` (scrypt, HMAC, `timingSafeEqual`). For
-  production, OIDC should use a vetted library or an authenticating proxy (see
-  PRODUCTION.md).
+- **Auth libraries**: the built-in login uses `node:crypto` (scrypt, HMAC,
+  `timingSafeEqual`). OIDC should use a vetted library or an authenticating proxy (see
+  [PRODUCTION.md](PRODUCTION.md)).
 
 ## Tooling images
 
 - **Build and run:** `node:24.22.1-alpine`, pinned by digest in the `Dockerfile`.
-- **Screenshots only, not part of the project:** `mcr.microsoft.com/playwright:v1.64.1-noble`
-  (Microsoft's official image).
+- **Screenshots:** `mcr.microsoft.com/playwright:v1.64.1-noble` (Microsoft's official
+  image).

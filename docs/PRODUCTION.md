@@ -1,10 +1,10 @@
 # Known limitations and production readiness
 
-## Known limitations (MVP)
+## Known limitations
 
-- **Verified in a lab, not in production.** The portal ran against a real Elastic 9.5.5
-  lab stack and a real Elastic Defend host, not against a production cluster or fleet size.
-  The remaining checks are listed in [ELASTIC.md](ELASTIC.md#still-to-verify).
+- **Tested in a lab.** The portal ran against an Elastic 9.5.5 lab stack and an Elastic
+  Defend host, not at production scale. The remaining checks are in
+  [ELASTIC.md](ELASTIC.md#still-to-verify).
 - **Overview Defend counts** come from paging through the tenant's agents (capped at 5,000
   per request, no cache). Large fleets need caching or a dedicated aggregation.
 - **Agent version facet** pages through up to 5,000 agents and is cached for 60 s, because
@@ -24,8 +24,7 @@
 **Authentication / SSO**
 
 - Use OIDC (Entra ID, Keycloak, …) in-app, or oauth2-proxy in front. Require an IdP
-  group or claim equal to the container's tenant. The tenant itself still comes from
-  config.
+  group or claim equal to the container's tenant.
 - Remove local users, or keep them only for break-glass access.
 
 **Tenant mapping**
@@ -61,7 +60,7 @@
 **Health**
 
 - Use `/healthz` as the liveness probe and `/readyz` as the readiness probe (it checks
-  Kibana reachability). Neither exposes tenant data.
+  Kibana reachability).
 
 **Logging**
 
@@ -71,8 +70,7 @@
 
 **Monitoring**
 
-- Track Elastic latency and error rate. Optionally export Prometheus metrics, which would
-  add a dependency to evaluate.
+- Track Elastic latency and error rate, optionally as Prometheus metrics.
 
 **Scalability and rate limits**
 
@@ -83,9 +81,9 @@
 
 **Version compatibility**
 
-- Pin `elastic-api-version`.
 - Run the normalizer tests against fixtures captured from each supported Elastic version.
-- Re-verify Fleet, Endpoint and alerts field names on every stack upgrade.
+- On every stack upgrade, re-verify Fleet, Endpoint and alert field names and the Kibana
+  `elastic-api-version` the portal sends (`2023-10-31`).
 
 ## Recommended next steps
 

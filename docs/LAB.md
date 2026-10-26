@@ -1,8 +1,8 @@
 # Lab: real Elastic backend
 
-A dedicated Elastic **9.5.5** stack for this project (trial license), isolated from any
-other stack on the machine: own Compose project `mssp-lab`, own network and volume, host
-ports `127.0.0.1:9201` (Elasticsearch) and `127.0.0.1:5602` (Kibana).
+An Elastic **9.5.5** stack for this project (trial license) with its own Compose project
+`mssp-lab`, network and volume, on `127.0.0.1:9201` (Elasticsearch) and
+`127.0.0.1:5602` (Kibana).
 
 ## What it contains
 
@@ -19,14 +19,14 @@ ports `127.0.0.1:9201` (Elasticsearch) and `127.0.0.1:5602` (Kibana).
 - **Per-tenant read-only API keys** in `secrets/<tenant>/elastic_api_key` for the portal.
 - **Four real Fleet agents** (containers): `ACME-WS-001`, `ACME-WS-002`, `ACME-SRV-001` and
   `GLBX-WS-001`. Defend can't run in a container, so on the Defend policies its component
-  reports `FAILED` and Fleet shows the agent as degraded, which is a realistic case.
+  reports `FAILED` and Fleet shows the agent as degraded.
 
 ## Alerts
 
 `lab/feed-alerts.mjs` writes Elastic Defend-format alert documents for the real agents
-into `logs-endpoint.alerts-<namespace>`. The **real** Endpoint Security rule then turns them
-into Kibana alerts, so the portal reads genuine alerts-as-data documents: rule-name
-override, `kibana.alert.*` fields, workflow state.
+into `logs-endpoint.alerts-<namespace>`. The Endpoint Security rule then turns them into
+Kibana alerts, so the portal reads alerts as Kibana writes them: rule-name override,
+`kibana.alert.*` fields, workflow state.
 
 | Type                          | Source of the document                                                                                                                                                                             |
 | ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -83,8 +83,8 @@ is in `lab/.env`.
 
 ## Real Elastic Defend host (VMware)
 
-Elastic Defend needs a real host. Verified with a Windows Server 2025 VM on a host-only
-VMware network (results in [ELASTIC.md](ELASTIC.md#verified-on-a-real-elastic-defend-host-windows-server-2025-elastic-955)):
+Elastic Defend can't run in the lab's agent containers. Verified with a Windows Server 2025
+VM on a host-only VMware network (results in [ELASTIC.md](ELASTIC.md#verified-on-a-real-elastic-defend-host-windows-server-2025-elastic-955)):
 
 1. **Reach the lab from the VM.** Relay Fleet Server and Elasticsearch to the host-only
    address (here `192.168.126.1`), and map the names the lab policies use in the VM's
@@ -103,10 +103,15 @@ VMware network (results in [ELASTIC.md](ELASTIC.md#verified-on-a-real-elastic-de
 
 2. **Install** Elastic Agent 9.5.5 (official zip from `artifacts.elastic.co`, SHA-512
    checked; it bundles `endpoint-security.exe`, so an offline VM needs nothing else):
-   `elastic-agent.exe install --non-interactive --insecure --url=http://fleet-server:8220
---enrollment-token=<ACME_WORKSTATIONS_TOKEN>`. If the install is run from a PowerShell
-   script with `$ErrorActionPreference = 'Stop'`, the agent's progress output on stderr
-   aborts it before enrollment; run `elastic-agent.exe enroll` with the same arguments.
+
+   ```powershell
+   elastic-agent.exe install --non-interactive --insecure --url=http://fleet-server:8220 --enrollment-token=<ACME_WORKSTATIONS_TOKEN>
+   ```
+
+   In a PowerShell script with `$ErrorActionPreference = 'Stop'`, the agent's progress
+   output on stderr aborts the install before enrollment; then run `elastic-agent.exe enroll`
+   with the same arguments.
+
 3. **Trigger alerts** with benign techniques Microsoft Defender does not block on a server,
    e.g. `cmd.exe` copied as `svchost.exe` into `C:\Users\Public\…` and run, or a scheduled
    task pointing there. Elastic Defend prevents them and writes behavior alerts within
@@ -116,9 +121,9 @@ VMware network (results in [ELASTIC.md](ELASTIC.md#verified-on-a-real-elastic-de
      kills it), then XOR the changed ones back (Defend kills that too, so repeat) and compare
      with the backed-up hashes.
    - **Malware (EICAR):** on a server Microsoft Defender catches EICAR first. Have the VM's
-     admin add an exclusion for one test folder (`Add-MpPreference -ExclusionPath
-C:\MsspEicarTest`), write EICAR there, and remove the exclusion afterwards
-     (`Remove-MpPreference`).
+     admin add an exclusion for one test folder
+     (`Add-MpPreference -ExclusionPath C:\MsspEicarTest`), write EICAR there, and remove the
+     exclusion afterwards (`Remove-MpPreference`).
 4. **Isolate and release** the host from Kibana (Security → Endpoints, or
    `POST /s/acme/api/endpoint/action/isolate` / `unisolate`) to check the isolation display.
 5. **Remove it again**: `elastic-agent.exe uninstall --force` on the VM, remove the `hosts`

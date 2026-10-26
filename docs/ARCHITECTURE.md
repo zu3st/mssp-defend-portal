@@ -12,11 +12,9 @@
 ```
 
 - **One container serves one tenant.** The tenant (space, policies, namespaces, alias)
-  comes from the container environment and is held by a single `Portal` instance. No
-  request input selects or changes the tenant.
+  comes from the container environment and is held by a single `Portal` instance.
 - **Single service.** SvelteKit renders the UI on the server and serves the data loads and
-  one small JSON endpoint (`/api/alerts/:id` for the side panel). There is no separate API
-  container.
+  one small JSON endpoint (`/api/alerts/:id` for the side panel).
 - **Browser boundary.** The CSP limits `connect-src` to `'self'`. Elastic URLs and keys exist
   only in server modules (`src/lib/server/**`), which SvelteKit refuses to bundle for the
   client.
@@ -31,7 +29,7 @@
 | `src/lib/server/params.ts`   | Strict URL-parameter parsing (allowlists, clamps, date validation)     |
 | `src/lib/server/normalize/*` | Raw Elastic → contract, per detection type                             |
 | `src/lib/server/elastic/*`   | Read-only HTTP client, KQL/DSL builders, real data source              |
-| `src/lib/server/mock/*`      | **Synthetic** Elastic-shaped multi-customer cluster + in-memory source |
+| `src/lib/server/mock/*`      | Generated Elastic-shaped multi-customer cluster + in-memory source     |
 | `src/lib/range.ts`           | Time ranges as Kibana's date picker offers them: labels, URL, cookie   |
 | `src/lib/refresh.ts`         | Auto-refresh that waits while the user is reading or typing            |
 | `src/lib/components/**`      | UI components: tables, filters, time picker, alert flyout              |
@@ -42,33 +40,31 @@
 1. **Credential.** Each container uses its own API key. On the Elasticsearch side the key's
    role should be limited to the tenant's alerts alias, with a document-level-security
    query. On the Kibana side it should be limited to the tenant's space with read-only
-   feature privileges (see [ELASTIC.md](ELASTIC.md#per-tenant-api-key)). Even a portal bug
-   then cannot read other customers' data.
+   feature privileges (see [ELASTIC.md](ELASTIC.md#per-tenant-api-key)).
 2. **Query scope.** Every query is built with the tenant filter ANDed in:
    - Fleet: `policy_id:(…tenant policies…)` on the space-scoped Kibana URL.
    - Alerts: the space alias as the index, plus `kibana.space_ids = <space>`, plus
      `data_stream.namespace ∈ tenant namespaces`.
 
    The namespace filter matters because a space-wide _Endpoint Security_ rule can copy
-   other customers' Defend alerts into a space. The mock data contains exactly that trap
-   (globex alerts inside the acme index).
+   other customers' Defend alerts into a space.
 
 3. **Result verification.** `Portal` re-checks every returned agent (policy), endpoint
    metadata record (agent id) and alert (space and namespace). A foreign record raises
-   `ScopeViolationError`: the request fails closed with an opaque 500 and a loud server log
-   line, instead of being filtered silently.
+   `ScopeViolationError`: the request fails with an opaque 500 and a server log line.
 4. **Request input never authorizes.** Browser-supplied `policy` filters can only narrow
-   the tenant's own policies (foreign-only means no results, not all results). Parameters
-   such as `space`, `index` or `tenant` are ignored. A lookup by the id of another tenant's
-   agent or alert returns 404, so the portal never confirms that the record exists.
+   the tenant's own policies; a filter with only other tenants' policies returns no results.
+   Parameters such as `space`, `index` or `tenant` are ignored. Another tenant's agent or
+   alert id returns 404, like a missing one.
 5. **Session binding.** Session cookies are HMAC-signed with a per-container secret and
    carry the tenant id. A cookie from another tenant's container is rejected even if both
    containers were misconfigured with the same secret.
 
 The tests cover each layer:
 
-- `src/lib/server/isolation.spec.ts`: two tenants over the same mock cluster, the leak trap,
-  id probing, crafted parameters, a deliberately buggy source, and config fail-closed.
+- `src/lib/server/isolation.spec.ts`: two tenants over the same mock cluster, other
+  tenants' alerts in a tenant's alert index, id probing, crafted parameters, a deliberately
+  buggy source, and config fail-closed.
 - `scripts/e2e-lab.sh`: the same attacks over HTTP against two running containers.
 
 ## Read-only guarantees
@@ -78,18 +74,16 @@ The tests cover each layer:
   before it is sent (see the `read-only request allowlist` tests).
 - The portal accepts only GET/HEAD, except the `login` and `logout` form actions (405
   otherwise). Those POSTs must carry this container's `ORIGIN`.
-- No feature changes alert status, isolates hosts, runs response actions or manages
-  exclusions.
 
 ## Authentication
 
-- **Lab:** local users (scrypt hashes) from a secrets file. Login is rate-limited
+- **Built in:** local users (scrypt hashes) from a secrets file. Login is rate-limited
   per IP and user. The session is a stateless signed cookie (`HttpOnly`, `SameSite=Strict`,
-  `Secure` unless disabled for plain-HTTP lab).
+  `Secure` unless disabled for testing over plain HTTP).
 - **Production:** replace the login with OIDC/SAML, either in-app or behind an
   authenticating reverse proxy. Map an IdP group or claim to _this_ container's tenant and
-  reject users without it. The tenant still comes from container config, never from the
-  token. See [PRODUCTION.md](PRODUCTION.md).
+  reject users without it. The tenant still comes from the container configuration. See
+  [PRODUCTION.md](PRODUCTION.md).
 
 ## Time range and refresh
 
@@ -104,14 +98,13 @@ The tests cover each layer:
   Agents list and agent details refresh every 30 seconds on their own, as Fleet does. A
   refresh reloads data in place and waits while the tab is hidden or the user is busy (alert
   flyout, an open dropdown or menu, typing).
-- `range`, `tz` and `theme` are display preferences, not security state; the server
-  validates each before use.
+- `range`, `tz` and `theme` are display preferences; the server validates each before use.
 
 ## Normalization rules
 
 - **Response allowlist.** `_source.includes` requests only the fields in
   `ALERT_SOURCE_FIELDS`. Normalizers copy only contract fields, so internal metadata (rule
-  parameters, execution ids, space ids, artifacts) never leaves the server (tested).
+  parameters, execution ids, space ids, artifacts) stays on the server (tested).
 - **Missing data.** Missing values are omitted. A few type-relevant fields are shown as
   _Not available_. Nothing is inferred.
 - **Investigation status** is `kibana.alert.workflow_status` (open, acknowledged or closed;
@@ -122,8 +115,8 @@ The tests cover each layer:
   Investigation → Highlighted fields. Unlike Kibana, the rules behind the alert sit right
   under the title: the Elastic Defend rule (`rule.name`) and the Kibana detection rule,
   whose name is looked up from `kibana.alert.rule.uuid` because the Endpoint Security
-  rule's name override replaces it in the alert. Highlighted fields are a per-detection-type list of
-  ECS fields built server-side from the allowlist; there is no Table or JSON tab. Assignees
+  rule's name override replaces it in the alert. Highlighted fields are a per-detection-type
+  list of ECS fields built server-side from the allowlist. Assignees
   are shown as a count only (resolving names would need security-profile privileges, and
   the analysts' identities are internal).
 - **Two statuses, as in Kibana Security → Endpoints.** _Agent status_ is Fleet's calculated
