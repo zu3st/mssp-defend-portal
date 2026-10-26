@@ -18,9 +18,11 @@ read-only API key. The browser only ever talks to the portal.
 | ![](docs/screenshots/light-agents.png) | ![](docs/screenshots/light-agent.png) |
 
 > **Status:** MVP verified against a real Elastic 9.5.5 backend: real Fleet agents, the
-> real Endpoint Security rule and per-tenant API keys (see [docs/LAB.md](docs/LAB.md)). Mock
-> data stays the default for UI work. A real Elastic Defend host is the remaining step; see
-> [docs/ELASTIC.md](docs/ELASTIC.md#still-to-verify-needs-a-real-elastic-defend-host).
+> real Endpoint Security rule and per-tenant API keys (see [docs/LAB.md](docs/LAB.md)), plus
+> a real Elastic Defend host on Windows Server 2025: policy response, isolation, malware,
+> ransomware and behavior prevention alerts, and custom-rule scoping. Mock data stays the
+> default for UI work. Memory threat alerts and a Windows client remain to be verified; see
+> [docs/ELASTIC.md](docs/ELASTIC.md#still-to-verify).
 
 ## Quick start (lab, mock data)
 

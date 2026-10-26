@@ -117,21 +117,58 @@ describe('memory / shellcode alert', () => {
 });
 
 describe('ransomware alert', () => {
-	it('lists affected paths', () => {
+	it('reads a real canary alert (one file object)', () => {
+		// As written by Elastic Defend 9.5.5 on a Windows Server host in the lab.
 		const d = normalizeAlertDetail(
 			hit({
 				...common,
 				'kibana.alert.original_event.code': 'ransomware',
-				Ransomware: { feature: 'canary_files', files: { path: ['C:\\a', 'C:\\b'], count: 120 } },
-				process: { name: 'svhost32.exe' }
+				'kibana.alert.original_event.action': 'canary-activity',
+				'kibana.alert.original_event.type': ['info', 'start', 'change', 'denied'],
+				Ransomware: {
+					feature: 'canary',
+					version: '1.9.0',
+					files: {
+						path: 'c:\\aaantiransomelastic-do-not-touch-x\\canary.docm',
+						extension: 'docm',
+						operation: 'overwrite',
+						metrics: ['CANARY_ACTIVITY'],
+						entropy: 4.11,
+						data: '0A110E32'
+					}
+				},
+				process: { name: 'powershell.exe' }
 			})
 		);
 		expect(d.kind).toBe('ransomware');
 		expect(fields(d)).toMatchObject({
-			'Ransomware.feature': ['canary_files'],
-			'Ransomware.files.count': ['120'],
-			'Ransomware.files.path': ['C:\\a', 'C:\\b']
+			'Ransomware.feature': ['canary'],
+			'Ransomware.files.path': ['c:\\aaantiransomelastic-do-not-touch-x\\canary.docm'],
+			'Ransomware.files.operation': ['overwrite'],
+			'Ransomware.files.metrics': ['CANARY_ACTIVITY']
 		});
+		// The raw file bytes are not on the allowlist.
+		expect(JSON.stringify(d)).not.toContain('0A110E32');
+		expect(d.outcome).toBe('prevented');
+	});
+
+	it('lists every path when several files are affected', () => {
+		const d = normalizeAlertDetail(
+			hit({
+				...common,
+				'kibana.alert.original_event.code': 'ransomware',
+				Ransomware: {
+					feature: 'canary',
+					files: [
+						{ path: 'C:\\a.docx', operation: 'overwrite' },
+						{ path: 'C:\\b.xlsx', operation: 'rename' }
+					]
+				},
+				process: { name: 'svhost32.exe' }
+			})
+		);
+		expect(fields(d)['Ransomware.files.path']).toEqual(['C:\\a.docx', 'C:\\b.xlsx']);
+		expect(fields(d)['Ransomware.files.operation']).toEqual(['overwrite', 'rename']);
 		// No prevention signal present -> do not guess.
 		expect(d.outcome).toBe('unknown');
 	});
@@ -179,6 +216,38 @@ describe('behavior alert', () => {
 			{ tactic: 'Initial Access', techniqueId: 'T1566.001', technique: 'Spearphishing Attachment' }
 		]);
 		expect(d.outcome).toBe('detected');
+	});
+
+	it('reads MITRE from the alert when the rule has none (real Defend alert shape)', () => {
+		// As written by Elastic Defend 9.5.5 on a Windows Server host in the lab.
+		const d = normalizeAlertDetail(
+			hit({
+				...common,
+				'kibana.alert.original_event.code': 'behavior',
+				'kibana.alert.rule.threat': [],
+				rule: { name: 'Potential Masquerading as SVCHOST' },
+				threat: [
+					{
+						framework: 'MITRE ATT&CK',
+						tactic: { id: 'TA0005', name: 'Defense Evasion' },
+						technique: [
+							{
+								id: 'T1036',
+								name: 'Masquerading',
+								subtechnique: [{ id: 'T1036.004', name: 'Masquerade Task or Service' }]
+							}
+						]
+					}
+				]
+			})
+		);
+		expect(d.mitre).toEqual([
+			{
+				tactic: 'Defense Evasion',
+				techniqueId: 'T1036.004',
+				technique: 'Masquerading › Masquerade Task or Service'
+			}
+		]);
 	});
 });
 

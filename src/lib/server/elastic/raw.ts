@@ -164,8 +164,17 @@ export interface RawSearchResponse<A = Record<string, unknown>> {
  * Read a dotted ECS path from a `_source` that may mix nested objects and
  * flattened dotted keys, e.g. `{ "kibana.alert.severity": "high" }` and
  * `{ "process": { "parent": { "name": "x" } } }` and `{ "process.parent": { "name": "x" } }`.
+ * A list of objects on the way yields the values of all of them, as Elasticsearch
+ * flattens it (`Ransomware.files` is one object or a list of them).
  */
 export function field(source: unknown, path: string): unknown {
+	if (Array.isArray(source)) {
+		const all = source
+			.map((x) => field(x, path))
+			.filter((v) => v !== undefined)
+			.flat();
+		return all.length ? all : undefined;
+	}
 	if (source === null || typeof source !== 'object') return undefined;
 	const obj = source as Record<string, unknown>;
 	if (path in obj) return obj[path];

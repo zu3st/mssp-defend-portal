@@ -958,21 +958,28 @@ function buildAlert(
 			'payroll_2026.csv',
 			'scans'
 		].map((f) => `${base2}${sep}${f}`);
-		const count = rng.int(4, 600);
+		// Shape of a real Defend 9.5.5 canary alert (lab, Windows Server 2025).
+		const touched = files.slice(0, rng.int(1, 3));
 		return {
 			...endpointBase,
 			message: prevented ? 'Ransomware Prevention Alert' : 'Ransomware Detection Alert',
-			'kibana.alert.severity': 'critical',
-			'kibana.alert.risk_score': 99,
+			// Real canary alerts carry event.severity 73, so the rule rates them high.
+			'kibana.alert.severity': 'high',
+			'kibana.alert.risk_score': 73,
 			'kibana.alert.original_event.code': 'ransomware',
-			'kibana.alert.original_event.action': 'files-encrypted',
-			'kibana.alert.original_event.type': prevented ? ['info', 'denied'] : ['info', 'allowed'],
+			'kibana.alert.original_event.action': 'canary-activity',
+			'kibana.alert.original_event.type': prevented
+				? ['info', 'start', 'change', 'denied']
+				: ['info', 'start', 'change', 'allowed'],
 			event: {
 				code: 'ransomware',
 				module: 'endpoint',
 				kind: 'signal',
-				category: ['malware', 'intrusion_detection', 'file'],
-				type: prevented ? ['info', 'denied'] : ['info', 'allowed']
+				action: 'canary-activity',
+				category: ['malware', 'intrusion_detection', 'process', 'file'],
+				type: prevented
+					? ['info', 'start', 'change', 'denied']
+					: ['info', 'start', 'change', 'allowed']
 			},
 			process: {
 				name: os === 'windows' ? 'svhost32.exe' : 'enc',
@@ -985,9 +992,15 @@ function buildAlert(
 				parent: { name: os === 'windows' ? 'explorer.exe' : 'bash', pid: rng.int(300, 900) }
 			},
 			Ransomware: {
-				feature: rng.pick(['canary_files', 'behavior']),
-				version: '1.6.0',
-				files: { path: files.slice(0, rng.int(2, 5)), count }
+				feature: 'canary',
+				version: '1.9.0',
+				files: touched.map((path) => ({
+					path,
+					extension: path.split('.').pop(),
+					operation: 'overwrite',
+					metrics: ['CANARY_ACTIVITY'],
+					entropy: Math.round(rng.float() * 300 + 400) / 100
+				}))
 			}
 		};
 	}

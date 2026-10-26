@@ -11,7 +11,7 @@
 //   malware     - official elastic/endpoint-package sample (real capture), identity/timing rewritten
 //   memory      - structure of Kibana 9.5.5 EndpointDocGenerator.generateMemoryAlert
 //   behavior    - structure of Kibana 9.5.5 EndpointDocGenerator.generateBehaviorAlert
-//   ransomware  - MODELLED: no official sample exists; fields per the endpoint package schema
+//   ransomware  - shape of a real Defend 9.5.5 canary alert from the lab VM (no official sample)
 import { readFileSync } from 'node:fs';
 import { randomUUID, randomBytes } from 'node:crypto';
 
@@ -237,7 +237,7 @@ function behavior(a, ts, prevented) {
 	};
 }
 
-/** MODELLED - no official sample for ransomware alerts. */
+/** Shape of a real Defend 9.5.5 canary alert (lab, Windows Server 2025). */
 function ransomware(a, ts, prevented) {
 	const id = identity(a, ts, 'jdoe');
 	const base = `C:\\Users\\${id.user.name}\\Documents`;
@@ -245,14 +245,22 @@ function ransomware(a, ts, prevented) {
 		...id,
 		message: prevented ? 'Ransomware Prevention Alert' : 'Ransomware Detection Alert',
 		event: eventBase('ransomware', ['malware', 'intrusion_detection', 'file'], prevented, {
-			action: 'files-encrypted',
-			severity: SEVERITY.critical,
-			risk_score: SEVERITY.critical
+			action: 'canary-activity',
+			severity: SEVERITY.high,
+			risk_score: SEVERITY.high
 		}),
 		Ransomware: {
-			feature: 'canary_files',
-			version: '1.6.0',
-			files: { path: [`${base}\\Q3-financials.xlsx`, `${base}\\contracts`], count: 120 }
+			feature: 'canary',
+			version: '1.9.0',
+			files: [
+				{
+					path: `${base}\\Q3-financials.xlsx`,
+					extension: 'xlsx',
+					operation: 'overwrite',
+					metrics: ['CANARY_ACTIVITY'],
+					entropy: 4.11
+				}
+			]
 		},
 		process: {
 			pid: 6100,

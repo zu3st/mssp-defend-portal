@@ -49,8 +49,9 @@ const HIGHLIGHTED_BY_KIND: Record<AlertKind, string[]> = {
 	],
 	ransomware: [
 		'Ransomware.feature',
-		'Ransomware.files.count',
 		'Ransomware.files.path',
+		'Ransomware.files.operation',
+		'Ransomware.files.metrics',
 		'process.name',
 		'process.executable',
 		'process.hash.sha256',
@@ -247,18 +248,40 @@ export function normalizeAlertSummary(hit: RawAlertHit): AlertSummary {
 	};
 }
 
-type ThreatEntry = { tactic?: { name?: string }; technique?: { id?: string; name?: string }[] };
+type Technique = { id?: string; name?: string };
+type ThreatEntry = {
+	tactic?: { name?: string };
+	technique?: (Technique & { subtechnique?: Technique[] })[];
+};
 
+const threatList = (v: unknown): ThreatEntry[] =>
+	Array.isArray(v) ? v : v && typeof v === 'object' ? [v as ThreatEntry] : [];
+
+/**
+ * MITRE ATT&CK from the detection rule, else from the alert itself. Real Elastic
+ * Defend alerts carry it in `threat`, while the Endpoint Security rule's own
+ * `kibana.alert.rule.threat` is an empty list. Subtechniques are the most
+ * specific mapping, shown as "Technique › Subtechnique".
+ */
 function mitre(src: RawAlertSource): AlertDetail['mitre'] {
-	const raw = (field(src, 'kibana.alert.rule.threat') ?? field(src, 'threat')) as
-		ThreatEntry[] | ThreatEntry | undefined;
-	const entries = Array.isArray(raw) ? raw : raw ? [raw] : [];
+	const fromRule = threatList(field(src, 'kibana.alert.rule.threat'));
+	const entries = fromRule.length ? fromRule : threatList(field(src, 'threat'));
 	const out: AlertDetail['mitre'] = [];
 	for (const t of entries) {
 		const techniques = Array.isArray(t?.technique) ? t.technique : [];
 		if (techniques.length === 0 && t?.tactic?.name) out.push({ tactic: t.tactic.name });
 		for (const tech of techniques) {
-			out.push({ tactic: t.tactic?.name, techniqueId: tech?.id, technique: tech?.name });
+			const subs = Array.isArray(tech?.subtechnique) ? tech.subtechnique : [];
+			if (subs.length === 0) {
+				out.push({ tactic: t.tactic?.name, techniqueId: tech?.id, technique: tech?.name });
+			}
+			for (const sub of subs) {
+				out.push({
+					tactic: t.tactic?.name,
+					techniqueId: sub?.id ?? tech?.id,
+					technique: [tech?.name, sub?.name].filter(Boolean).join(' › ') || undefined
+				});
+			}
 		}
 	}
 	return out;

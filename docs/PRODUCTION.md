@@ -2,9 +2,9 @@
 
 ## Known limitations (MVP)
 
-- **Not yet run against real Elastic data.** Everything is validated against synthetic,
-  Elastic-shaped fixtures. Work through the list in
-  [ELASTIC.md](ELASTIC.md#to-verify-against-the-lab) first.
+- **Verified in a lab, not in production.** The portal ran against a real Elastic 9.5.5
+  lab stack and a real Elastic Defend host, not against a production cluster or fleet size.
+  The remaining checks are listed in [ELASTIC.md](ELASTIC.md#still-to-verify).
 - **Overview Defend counts** come from paging through the tenant's agents (capped at 5,000
   per request, no cache). Large fleets need caching or a dedicated aggregation.
 - **Agent version facet** pages through up to 5,000 agents and is cached for 60 s, because

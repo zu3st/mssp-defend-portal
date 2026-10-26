@@ -104,31 +104,79 @@ async function ensurePolicy(t, p) {
 		'GET',
 		`${s}/api/fleet/package_policies?kuery=${encodeURIComponent(`ingest-package-policies.policy_ids:"${p.id}" and ingest-package-policies.package.name:endpoint`)}`
 	);
-	if (must(pp, 'list package policies').items?.length)
-		return console.log(`  Elastic Defend on ${p.id}: exists`);
-	const pkg = must(await kb('GET', '/api/fleet/epm/packages/endpoint'), 'endpoint package').item;
-	must(
-		await kb('POST', `${s}/api/fleet/package_policies`, {
-			name: `Elastic Defend – ${p.id}`,
-			namespace: t.id,
-			policy_ids: [p.id],
-			package: { name: 'endpoint', version: pkg.version },
-			inputs: [
-				{
-					type: 'endpoint',
-					enabled: true,
-					streams: [],
-					config: {
-						integration_config: {
-							value: { type: 'endpoint', endpointConfig: { preset: 'EDRComplete' } }
+	let defend = must(pp, 'list package policies').items?.[0];
+	if (defend) console.log(`  Elastic Defend on ${p.id}: exists`);
+	else {
+		const pkg = must(await kb('GET', '/api/fleet/epm/packages/endpoint'), 'endpoint package').item;
+		defend = must(
+			await kb('POST', `${s}/api/fleet/package_policies`, {
+				name: `Elastic Defend – ${p.id}`,
+				namespace: t.id,
+				policy_ids: [p.id],
+				package: { name: 'endpoint', version: pkg.version },
+				inputs: [
+					{
+						type: 'endpoint',
+						enabled: true,
+						streams: [],
+						config: {
+							integration_config: {
+								value: { type: 'endpoint', endpointConfig: { preset: 'EDRComplete' } }
+							}
 						}
 					}
-				}
-			]
+				]
+			}),
+			`add Elastic Defend to ${p.id}`
+		).item;
+		console.log(`  Elastic Defend on ${p.id}: added (package ${pkg.version})`);
+	}
+	await ensurePrevention(s, defend.id);
+}
+
+/**
+ * Turn on Defend's protections in Prevent mode, as Kibana's "Complete EDR"
+ * preset does. Through the API the preset alone leaves malware, ransomware,
+ * memory and behavior protection "off" (events only), so a real Windows host
+ * would raise no alerts. Pop-up notifications stay off.
+ */
+async function ensurePrevention(s, id) {
+	const item = must(await kb('GET', `${s}/api/fleet/package_policies/${id}`), 'read Defend').item;
+	const policy = item.inputs[0].config.policy.value;
+	const want = {
+		malware: { mode: 'prevent', blocklist: true, on_write_scan: true },
+		ransomware: { mode: 'prevent', supported: true },
+		memory_protection: { mode: 'prevent', supported: true },
+		behavior_protection: { mode: 'prevent', supported: true }
+	};
+	let changed = false;
+	for (const os of ['windows', 'mac', 'linux']) {
+		for (const [k, v] of Object.entries(want)) {
+			const c = policy[os]?.[k];
+			if (!c) continue;
+			// Only settings this OS has; e.g. Linux has no malware blocklist.
+			for (const [f, x] of Object.entries(v)) {
+				if (f !== 'mode' && !(f in c)) continue;
+				if (c[f] !== x) changed = true;
+				c[f] = x;
+			}
+		}
+	}
+	if (!changed) return console.log('  protections: prevent');
+	const { name, namespace, policy_ids, package: pkg, inputs, enabled, description } = item;
+	must(
+		await kb('PUT', `${s}/api/fleet/package_policies/${id}`, {
+			name,
+			namespace,
+			policy_ids,
+			package: pkg,
+			inputs,
+			enabled,
+			description
 		}),
-		`add Elastic Defend to ${p.id}`
+		'set Defend protections to prevent'
 	);
-	console.log(`  Elastic Defend on ${p.id}: added (package ${pkg.version})`);
+	console.log('  protections: set to prevent');
 }
 
 async function enrollmentToken(t, p) {
