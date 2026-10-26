@@ -16,7 +16,8 @@
 - **Alert search** uses case-insensitive wildcards over a small fixed field set. It is
   bounded but not tuned for very large indices.
 - **Login rate limiting** is in memory and per container.
-- **Relative times** are rendered on the server and are not live-updated.
+- **Relative times** ("2 minutes ago") change only when the page reloads its data: on
+  navigation, Refresh, the time picker's auto-refresh, or the agent pages' 30-second refresh.
 
 ## Production checklist (alongside ECK)
 
@@ -33,6 +34,8 @@
   (customer → space, policies, namespaces).
 - Use one namespace per customer in Fleet policies, so alias, DLS and namespace filters
   all line up.
+- Scope each space's detection rules to that customer's namespace; by default they read
+  every customer's data (see [ELASTIC.md](ELASTIC.md#detection-rules-and-spaces)).
 
 **Secrets**
 
@@ -86,12 +89,9 @@
 
 ## Recommended next steps
 
-1. Run phase 1 discovery on the lab: stack version, spaces, policies, namespaces and
-   alert samples. Turn real alert documents (sanitized) into normalizer test fixtures.
-2. Create the per-tenant API keys and record which privileges were actually needed.
-3. Run `compose.elastic.yaml` against the lab, then re-run `scripts/e2e-lab.sh` with real
-   data.
-4. Add OIDC.
-5. Add caching for the overview.
-6. Optionally add read-only views of endpoint policy and exclusions, behind the same
+1. Add OIDC (see Authentication above).
+2. Add a short-lived cache for the overview, facets and status counts.
+3. Verify memory threat alerts and a Windows client (see
+   [ELASTIC.md](ELASTIC.md#still-to-verify)).
+4. Optionally add read-only views of endpoint policy and exclusions, behind the same
    scoping.

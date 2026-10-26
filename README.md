@@ -1,66 +1,193 @@
-# MSSP Elastic Defend Customer Portal
+# MSSP Defend Portal
 
-A read-only, customer-facing security portal for managed Elastic Defend. It shows
-endpoint health (Fleet agent **and** Elastic Defend), detections with investigation
-status, and per-agent detection history, without giving customers access to Kibana. The
-agent list and agent details page mirror Kibana Fleet; policy status uses Kibana Security's
-Endpoints wording.
+A managed security service provider (MSSP) that runs Elastic Defend for its customers
+usually keeps Kibana to itself: one cluster holds every customer's data, and Kibana is
+built for analysts. Customers still want to see how their endpoints are protected and what
+was detected on them.
 
-**One container serves one customer** and talks to Elastic with that customer's own
-read-only API key. The browser only ever talks to the portal.
+MSSP Defend Portal gives each customer a read-only web portal for that:
 
-| Overview                                 | Detection detail (memory threat)             |
+- **Overview:** agent health, Elastic Defend policy status, active detections, threats
+  prevented and detections by severity, with the agents that need attention.
+- **Detections:** the customer's Elastic Security alerts with severity, outcome
+  (prevented or detected), investigation status and closing reason, and a details panel
+  modelled on Kibana's alert flyout.
+- **Agents:** a Fleet-style agent list and agent page with Elastic Defend policy status,
+  network isolation, integration health and the agent's detections.
+
+The portal never changes anything in Elastic, and the browser talks only to the portal.
+
+| Overview                                 | Detection details                            |
 | ---------------------------------------- | -------------------------------------------- |
 | ![](docs/screenshots/light-overview.png) | ![](docs/screenshots/dark-detail-memory.png) |
 
-| Agents (Fleet-style)                   | Agent details (mock data)             |
+| Agents                                 | Agent details                         |
 | -------------------------------------- | ------------------------------------- |
 | ![](docs/screenshots/light-agents.png) | ![](docs/screenshots/light-agent.png) |
 
-> **Status:** MVP verified against a real Elastic 9.5.5 backend: real Fleet agents, the
-> real Endpoint Security rule and per-tenant API keys (see [docs/LAB.md](docs/LAB.md)), plus
-> a real Elastic Defend host on Windows Server 2025: policy response, isolation, malware,
-> ransomware and behavior prevention alerts, and custom-rule scoping. Mock data stays the
-> default for UI work. Memory threat alerts and a Windows client remain to be verified; see
-> [docs/ELASTIC.md](docs/ELASTIC.md#still-to-verify).
+## How customers are kept apart
 
-## Quick start (lab, mock data)
+- **One container per customer.** Its configuration binds it to that customer's Kibana
+  space, agent policies and data stream namespaces. Without them it refuses to start.
+- **One API key per customer.** Each container uses its own read-only Elastic API key,
+  limited to that customer's space and data, with document-level security in
+  Elasticsearch.
+- **Every query is scoped, every result is checked.** The portal filters by space,
+  namespace and agent policy, and checks each document again before using it. A document
+  of another customer is refused and logged as `TENANT SCOPE VIOLATION`.
+- **No raw documents.** Only allowlisted fields, normalized on the server, reach the
+  browser.
 
-Everything runs in Docker. You do not need Node on the host.
+[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) describes the design in detail.
+
+## Requirements
+
+- Elastic Stack 9.x with Elastic Security and space-aware Fleet. Verified with 9.5.5.
+- Per customer: a Kibana space, the customer's agent policies in that space, and a data
+  stream namespace of its own, set on those agent policies. Using the space id as the
+  namespace keeps it simple.
+- The prebuilt **Endpoint Security (Elastic Defend)** rule enabled in the customer's space,
+  which turns Elastic Defend alerts into Elastic Security alerts. Detection rules read every
+  customer's data unless restricted; see
+  [Detection rules and spaces](docs/ELASTIC.md#detection-rules-and-spaces).
+- Docker or Kubernetes to run the container.
+
+## Setting up a customer
+
+The steps use a customer `contoso` with the space, namespace and agent policy id
+`contoso`.
+
+1. **Create the customer's API key** with the request in
+   [docs/ELASTIC.md](docs/ELASTIC.md#per-tenant-api-key), and save the `encoded` value as
+   `secrets/contoso/elastic_api_key`.
+2. **Create a session secret** of at least 32 characters:
+
+   ```bash
+   openssl rand -base64 48 > secrets/contoso/session_secret
+   ```
+
+3. **Create the users file.** Hash each password:
+
+   ```bash
+   docker run --rm -it -v "$PWD/scripts:/s:ro" node:24.22.1-alpine node /s/hash-password.mjs
+   ```
+
+   and list the users in `secrets/contoso/users.json`:
+
+   ```json
+   { "jane.doe": "scrypt$…" }
+   ```
+
+   The container runs as uid 1000, which must be able to read these files.
+
+4. **Build the image** once for all customers:
+
+   ```bash
+   docker build -t mssp-defend-portal .
+   ```
+
+   The build runs the type check and the tests, so a failing build produces no image.
+
+5. **Run the customer's container:**
+
+   ```bash
+   docker run -d --name portal-contoso --read-only --tmpfs /tmp --cap-drop ALL \
+     --security-opt no-new-privileges -p 127.0.0.1:3201:3000 \
+     -v "$PWD/secrets/contoso:/run/secrets:ro" \
+     -e TENANT_ID=contoso -e TENANT_NAME='Contoso Ltd' \
+     -e TENANT_AGENT_POLICY_IDS=contoso -e TENANT_NAMESPACES=contoso \
+     -e DATA_SOURCE=elastic \
+     -e ELASTICSEARCH_URL=https://elasticsearch.example:9200 \
+     -e KIBANA_URL=https://kibana.example:5601 \
+     -e ELASTIC_API_KEY_FILE=/run/secrets/elastic_api_key \
+     -e SESSION_SECRET_FILE=/run/secrets/session_secret \
+     -e PORTAL_USERS_FILE=/run/secrets/users.json \
+     -e ORIGIN=https://portal.contoso.example \
+     mssp-defend-portal
+   ```
+
+6. **Publish it over TLS** through a reverse proxy or ingress at the `ORIGIN` address.
+
+Local users are meant for the lab. For production, put single sign-on in front and work
+through the checklist in [docs/PRODUCTION.md](docs/PRODUCTION.md).
+
+## Configuration
+
+| Variable                             | Required    | Meaning                                                                                                 |
+| ------------------------------------ | ----------- | ------------------------------------------------------------------------------------------------------- |
+| `TENANT_ID`                          | yes         | Portal tenant id; sessions are bound to it                                                              |
+| `TENANT_NAME`                        | –           | Display name                                                                                            |
+| `KIBANA_SPACE_ID`                    | –           | Customer's Kibana space (default: `TENANT_ID`)                                                          |
+| `TENANT_AGENT_POLICY_IDS`            | yes         | Comma-separated Fleet agent policy ids of this customer                                                 |
+| `TENANT_NAMESPACES`                  | yes         | Data stream namespaces of this customer's policies                                                      |
+| `ALERTS_INDEX`                       | –           | Default `.alerts-security.alerts-<space>`                                                               |
+| `DATA_SOURCE`                        | –           | `mock` (default) or `elastic`                                                                           |
+| `ELASTICSEARCH_URL`, `KIBANA_URL`    | elastic     | Backend URLs, reachable only from the container                                                         |
+| `ELASTIC_API_KEY[_FILE]`             | elastic     | Tenant-specific read-only API key (encoded form)                                                        |
+| `ELASTIC_TIMEOUT_MS`                 | –           | Timeout of each Elastic request, default 10000                                                          |
+| `NODE_EXTRA_CA_CERTS`                | –           | CA bundle for the Elastic TLS certificates                                                              |
+| `SESSION_SECRET[_FILE]`              | yes         | At least 32 characters; unique per container                                                            |
+| `PORTAL_USERS_FILE` / `PORTAL_USERS` | yes         | JSON `{user: scryptHash}` / `user:hash,…`                                                               |
+| `ORIGIN`                             | recommended | Public origin(s), comma-separated, e.g. `https://portal.acme.example`; POSTs must come from one of them |
+| `COOKIE_SECURE`                      | –           | `true` by default; `false` only for plain-HTTP labs                                                     |
+| `SESSION_TTL_SECONDS`                | –           | Default 8 hours                                                                                         |
+
+`/healthz` reports that the portal runs and `/readyz` that it reaches Kibana. Neither
+needs a login or shows customer data.
+
+## Using the portal
+
+- **Time range:** Overview, Detections and an agent's detections share one date picker, as
+  in Kibana, with quick
+  selection, commonly used ranges and a custom date range. The choice carries across views
+  for the browser session. _Today_ and _This week_ follow the browser's time zone.
+- **Refresh:** the date picker's _Refresh every_ reloads data at an interval of your choice,
+  and pauses while a detection is open. The agent pages refresh every 30 seconds, as Fleet
+  does.
+- **Theme:** light, dark or the system setting.
+
+## Status
+
+Verified against an Elastic 9.5.5 lab with two customers, real Fleet agents and the real
+Endpoint Security rule, and with Elastic Defend on a Windows Server 2025 VM: policy
+response, isolation, malware, ransomware and behavior prevention alerts, and custom rules.
+Memory threat alerts and a Windows client remain to be verified; see
+[docs/ELASTIC.md](docs/ELASTIC.md#still-to-verify).
+
+## Trying it out
+
+The portal runs on generated, Elastic-shaped data without an Elastic stack. This starts
+two customers, `acme` and `globex`:
 
 ```bash
 ./scripts/lab-init.sh
 ```
 
-This creates `secrets/<tenant>/` (session secret plus one demo user) for `acme` and
-`globex`, and prints the generated demo passwords once.
-
 ```bash
 docker compose up -d --build
 ```
 
-- Acme portal: <http://localhost:3101> (user `acme.analyst`)
-- Globex portal: <http://localhost:3102> (user `globex.analyst`)
+The first command creates a session secret and a demo user per customer and prints the
+passwords once. The Acme portal is then on <http://localhost:3101> (user `acme.analyst`)
+and the Globex portal on <http://localhost:3102> (user `globex.analyst`).
 
-The image build runs the type check and the unit tests, so a broken build never produces an image.
-
-Run the HTTP-level tenant-isolation and read-only checks against the two running containers:
-
-```bash
-A_USER=acme.analyst A_PASS='…' B_USER=globex.analyst B_PASS='…' ./scripts/e2e-lab.sh
-```
-
-## Connecting to the lab Elastic stack
-
-The project has its own Elastic 9.5.5 lab stack in `lab/`, with real Fleet agents, the real
-Endpoint Security rule and per-tenant API keys. See [docs/LAB.md](docs/LAB.md) to start it.
-Then run the portals against it:
+The project also has its own Elastic 9.5.5 lab stack in `lab/`. Start it as described in
+[docs/LAB.md](docs/LAB.md), then connect the portals to it:
 
 ```bash
 docker compose -f compose.yaml -f compose.elastic.yaml up -d --build
 ```
 
-## Development (in Docker)
+`scripts/e2e-lab.sh` runs tenant isolation and read-only checks over HTTP against the two
+running portals:
+
+```bash
+A_USER=acme.analyst A_PASS='…' B_USER=globex.analyst B_PASS='…' ./scripts/e2e-lab.sh
+```
+
+## Development
+
+Everything runs in Docker; Node is not needed on the host.
 
 ```bash
 docker run --rm -it -u "$(id -u):$(id -g)" -e HOME=/tmp -v "$PWD":/app -w /app node:24.22.1-alpine npm ci
@@ -74,39 +201,27 @@ docker run --rm -u "$(id -u):$(id -g)" -e HOME=/tmp -v "$PWD":/app -w /app node:
 docker run --rm -it -u "$(id -u):$(id -g)" -e HOME=/tmp -v "$PWD":/app -v "$PWD/secrets/acme:/run/secrets:ro" --env-file .env.example -e COOKIE_SECURE=false -p 5173:5173 -w /app node:24.22.1-alpine npx vite dev --host 0.0.0.0
 ```
 
-The last command starts a dev server for one tenant on <http://localhost:5173> (tenant `acme`, mock data).
+The commands install the dependencies, run the type check and the tests, and start a
+development server for the `acme` customer with generated data on <http://localhost:5173>.
 
-To hash a password for a users file:
+## Repository layout
 
-```bash
-docker run --rm -it -v "$PWD/scripts:/s:ro" node:24.22.1-alpine node /s/hash-password.mjs
-```
-
-## Configuration
-
-| Variable                             | Required    | Meaning                                                                                                 |
-| ------------------------------------ | ----------- | ------------------------------------------------------------------------------------------------------- |
-| `TENANT_ID`                          | yes         | Portal tenant id; sessions are bound to it                                                              |
-| `TENANT_NAME`                        | –           | Display name                                                                                            |
-| `KIBANA_SPACE_ID`                    | –           | Customer's Kibana space (default: `TENANT_ID`)                                                          |
-| `TENANT_AGENT_POLICY_IDS`            | yes         | Comma-separated Fleet agent policy ids of this customer                                                 |
-| `TENANT_NAMESPACES`                  | yes         | Data-stream namespaces of this customer's policies                                                      |
-| `ALERTS_INDEX`                       | –           | Default `.alerts-security.alerts-<space>`                                                               |
-| `DATA_SOURCE`                        | –           | `mock` (default) or `elastic`                                                                           |
-| `ELASTICSEARCH_URL`, `KIBANA_URL`    | elastic     | Backend URLs, reachable only from the container                                                         |
-| `ELASTIC_API_KEY[_FILE]`             | elastic     | Tenant-specific read-only API key (encoded form)                                                        |
-| `NODE_EXTRA_CA_CERTS`                | –           | CA bundle for the Elastic TLS certificates                                                              |
-| `SESSION_SECRET[_FILE]`              | yes         | ≥ 32 characters; unique per container                                                                   |
-| `PORTAL_USERS_FILE` / `PORTAL_USERS` | yes         | JSON `{user: scryptHash}` / `user:hash,…`                                                               |
-| `ORIGIN`                             | recommended | Public origin(s), comma-separated, e.g. `https://portal.acme.example`; POSTs must come from one of them |
-| `COOKIE_SECURE`                      | –           | `true` by default; `false` only for plain-HTTP lab                                                      |
-| `SESSION_TTL_SECONDS`                | –           | Default 8 h                                                                                             |
-
-Missing tenant policies or namespaces make the container **refuse to start** (fail closed).
+- `src/routes/`: pages (overview, detections, agents, login) and the alert details API
+- `src/lib/components/`: UI components
+- `src/lib/server/`: configuration, authentication, tenant scoping (`portal.ts`) and URL
+  parameter parsing
+- `src/lib/server/elastic/`: read-only Elastic client and queries
+- `src/lib/server/normalize/`: Elastic documents to the portal's data contract
+- `src/lib/server/mock/`: generated Elastic-shaped data for several customers
+- `lab/`: Elastic lab stack, tenant setup and alert feeder
+- `scripts/`: lab secrets, password hashing and HTTP checks
+- `docs/`: architecture, Elastic APIs and privileges, lab, dependencies, production
+  readiness
 
 ## Documentation
 
-- [Architecture, tenant isolation and auth](docs/ARCHITECTURE.md)
-- [Elastic APIs, aliases, fields and privileges](docs/ELASTIC.md)
+- [Architecture, tenant isolation and authentication](docs/ARCHITECTURE.md)
+- [Elastic APIs, fields, privileges and verification](docs/ELASTIC.md)
+- [Lab stack and real Elastic Defend host](docs/LAB.md)
 - [Dependencies and why they are trusted](docs/DEPENDENCIES.md)
 - [Known limitations and production readiness](docs/PRODUCTION.md)

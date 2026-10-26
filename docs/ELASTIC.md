@@ -97,6 +97,28 @@ POST /_security/api_key
 The `query` adds Elasticsearch-enforced document-level security on top of the portal's own
 filters. Use the `encoded` value from the response as `ELASTIC_API_KEY`.
 
+## Detection rules and spaces
+
+A Kibana space scopes rule objects and where their alerts are stored
+(`.alerts-security.alerts-<space>`), not the data a rule reads. Elastic Defend writes to
+`logs-endpoint.*-<namespace>`, and the prebuilt rules read `logs-endpoint.alerts-*`,
+`logs-endpoint.events.process-*` and similar patterns, which match every namespace. In the
+lab, each space's Endpoint Security rule therefore also promoted the other customer's Defend
+alerts (see the table below). A rule always writes to its own space, so with a space per
+customer every rule runs once per space. To keep each copy to its customer:
+
+- Give each customer's agent policies their own namespace (Fleet pre-fills `default` in
+  every space).
+- Restrict each space's rules to that namespace, by index pattern (`logs-endpoint.alerts-contoso`;
+  prebuilt rule customization needs an Enterprise license, and rule upgrades can add patterns
+  back) or by a rule exception `data_stream.namespace is not contoso`.
+- Save or enable each space's rules as a user who can read only that customer's data
+  (for example `*-contoso`). A rule runs with the privileges of the user who last saved or
+  enabled it, so this holds even for a rule someone forgets to restrict.
+
+The portal does not depend on this: it filters every alert query by space and namespace.
+Correctly scoped rules keep Kibana itself and your analysts' view clean.
+
 ## Verified against the lab (Elastic 9.5.5)
 
 Checked on the project's lab stack (`lab/`, see [LAB.md](LAB.md)): real Fleet agents in

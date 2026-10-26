@@ -32,7 +32,7 @@ interface AllowedRoute {
 const SPACE = '(?:/s/[a-z0-9_-]+)?';
 
 /** POST is allowed only for read-only search APIs that take a body. */
-export const READ_ONLY_ROUTES: AllowedRoute[] = [
+const READ_ONLY_ROUTES: AllowedRoute[] = [
 	{ target: 'kibana', method: 'GET', pattern: new RegExp(`^${SPACE}/api/fleet/agents$`) },
 	{ target: 'kibana', method: 'GET', pattern: new RegExp(`^${SPACE}/api/fleet/agents/tags$`) },
 	{

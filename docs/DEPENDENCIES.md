@@ -27,11 +27,11 @@ the **runtime image contains no `node_modules`**.
 ## Deliberately not used
 
 - **`@elastic/elasticsearch`**: the portal needs only `_search`. Node's built-in `fetch`
-  plus a read-only route allowlist avoids coupling the client major version to the server
-  major version (the lab version is still unknown) and adds no transitive dependencies.
+  plus a read-only route allowlist avoids coupling the client major version to the cluster's
+  major version and adds no transitive dependencies.
   It can be reintroduced if bulk or scroll APIs are ever needed.
 - **shadcn-svelte / bits-ui / tailwind-variants / tailwind-merge / clsx**: the few
-  components needed (badge, table, dropdown filter, side sheet) are written by hand in the
+  components needed (badge, table, dropdown filter, date picker, side sheet) are written by hand in the
   same style. They use native `<dialog>` and `<details>`, which handle focus and Escape and
   work without JavaScript. This avoids about 4 packages, and SvelteKit 3's `#lib` alias was
   not yet supported by the shadcn CLI.
