@@ -902,10 +902,12 @@ function buildAlert(
 						executable: os === 'windows' ? 'C:\\Windows\\System32\\svchost.exe' : '/usr/sbin/sshd'
 					}
 				},
+				// As in a real Defend 9.5.5 shellcode-thread alert (lab, Windows Server 2025).
 				Memory_protection: {
 					feature: 'shellcode_thread',
 					self_injection: false,
-					cross_session: rng.chance(0.2)
+					cross_session: rng.chance(0.2),
+					parent_to_child: false
 				}
 			};
 		}

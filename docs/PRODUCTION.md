@@ -90,7 +90,7 @@
 
 1. Add OIDC (see Authentication above).
 2. Add a short-lived cache for the overview, facets and status counts.
-3. Verify memory threat alerts and a Windows client (see
+3. Verify memory signature alerts from a real host (see
    [ELASTIC.md](ELASTIC.md#still-to-verify)).
 4. Optionally add read-only views of endpoint policy and exclusions, behind the same
    scoping.

@@ -32,7 +32,7 @@ Kibana alerts, so the portal reads alerts as Kibana writes them: rule-name overr
 | Type                          | Source of the document                                                                                                                                                                             |
 | ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Malware                       | Official [endpoint-package sample](https://github.com/elastic/endpoint-package/blob/main/package/endpoint/data_stream/alerts/sample_event.json) (real capture), identity and timing rewritten      |
-| Memory (signature, shellcode) | Structure of Kibana 9.5.5 `EndpointDocGenerator.generateMemoryAlert`                                                                                                                               |
+| Memory (signature, shellcode) | Signature: structure of Kibana 9.5.5 `EndpointDocGenerator.generateMemoryAlert`. Shellcode: shape of a real Elastic Defend 9.5.5 alert from the lab VM                                             |
 | Behavior                      | Structure of Kibana 9.5.5 `EndpointDocGenerator.generateBehaviorAlert`                                                                                                                             |
 | Ransomware                    | Shape of a real Elastic Defend 9.5.5 canary alert from the lab VM (see [ELASTIC.md](ELASTIC.md#verified-on-a-real-elastic-defend-host-windows-server-2025-elastic-955)); no official sample exists |
 
@@ -121,6 +121,10 @@ VM on a host-only VMware network (results in [ELASTIC.md](ELASTIC.md#verified-on
      `C:\zzAntiRansomElastic-DO-NOT-TOUCH-…`, XOR them in place from a separate process (Defend
      kills it), then XOR the changed ones back (Defend kills that too, so repeat) and compare
      with the backed-up hashes.
+   - **Memory threat:** in a notepad started for the test, reserve one page of executable
+     memory, write a single `ret` (`0xC3`) and start a remote thread there
+     (`VirtualAllocEx`, `WriteProcessMemory`, `CreateRemoteThread`). Defend raises a
+     shellcode-thread alert. Injecting a signed DLL raises none.
    - **Malware (EICAR):** on a server Microsoft Defender catches EICAR first. Have the VM's
      admin add an exclusion for one test folder
      (`Add-MpPreference -ExclusionPath C:\MsspEicarTest`), write EICAR there, and remove the

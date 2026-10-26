@@ -131,10 +131,15 @@ function memory(a, ts, prevented, shellcode) {
 				risk_score: shellcode ? SEVERITY.high : SEVERITY.critical
 			}
 		),
-		Memory_protection: {
-			feature: shellcode ? 'shellcode_thread' : 'signature',
-			self_injection: !shellcode
-		},
+		// Shellcode: as in a real Defend 9.5.5 alert from the lab VM.
+		Memory_protection: shellcode
+			? {
+					feature: 'shellcode_thread',
+					self_injection: false,
+					cross_session: false,
+					parent_to_child: false
+				}
+			: { feature: 'signature', self_injection: true },
 		process: {
 			pid: 4000 + Math.floor(Math.random() * 4000),
 			entity_id: hex(16),
