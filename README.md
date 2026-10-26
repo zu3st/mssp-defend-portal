@@ -31,14 +31,14 @@ passes on only the fields it shows, such as the highlighted fields of each detec
 
 ## Requirements
 
-- Elastic Stack 9.x with Elastic Security and space-aware Fleet. Verified with 9.5.5.
+- Elastic Stack 9.4 or later with Elastic Security and space-aware Fleet. Verified with 9.5.5.
 - Per customer: a Kibana space, the customer's agent policies in that space, and a data
   stream namespace of its own, set on those agent policies. Using the space id as the
   namespace keeps it simple.
 - The prebuilt **Endpoint Security (Elastic Defend)** rule enabled in the customer's space,
-  which turns Elastic Defend alerts into Elastic Security alerts. Detection rules read every
-  customer's data unless restricted; see
-  [Detection rules and spaces](docs/ELASTIC.md#detection-rules-and-spaces).
+  which turns Elastic Defend alerts into Elastic Security alerts, with the space's
+  _Included data stream namespaces for rule execution_ set to the customer's namespace (see
+  [Detection rules and spaces](docs/ELASTIC.md#detection-rules-and-spaces)).
 - Docker or Kubernetes to run the container.
 
 ## Setting up a customer

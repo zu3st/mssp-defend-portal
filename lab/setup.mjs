@@ -5,7 +5,8 @@
 //
 // Per tenant (Kibana space): agent policies with their own data-stream
 // namespace (Elastic Defend on some), the prebuilt "Endpoint Security (Elastic
-// Defend)" rule installed and enabled, Fleet enrollment tokens (appended to
+// Defend)" rule installed and enabled, detection rules limited to the
+// tenant's namespace, Fleet enrollment tokens (appended to
 // lab/.env for the agent containers) and a read-only, tenant-scoped API key in
 // secrets/<tenant>/elastic_api_key for the portal container.
 import { mkdirSync, readFileSync, writeFileSync, chmodSync } from 'node:fs';
@@ -192,6 +193,25 @@ async function enrollmentToken(t, p) {
 	return key.api_key;
 }
 
+/**
+ * Limit every detection rule in the tenant's space to the tenant's namespace
+ * (Kibana 9.4+). Rule index patterns such as `logs-endpoint.alerts-*` match all
+ * namespaces, so without this each space's rules also read other tenants' data.
+ */
+async function ensureRuleNamespaces(t) {
+	const key = 'securitySolution:includedDataStreamNamespacesForRuleExecution';
+	const r = must(
+		await kb(
+			'POST',
+			`/s/${t.id}/internal/kibana/settings`,
+			{ changes: { [key]: [t.id] } },
+			{ 'x-elastic-internal-origin': 'lab-setup' }
+		),
+		`limit rules in ${t.id} to its namespace`
+	);
+	console.log(`rule namespaces in ${t.id}: ${JSON.stringify(r.settings?.[key]?.userValue)}`);
+}
+
 /** Install and enable only the prebuilt Endpoint Security rule in this space. */
 async function ensureEndpointRule(t) {
 	const s = `/s/${t.id}`;
@@ -324,6 +344,7 @@ for (const t of TENANTS) {
 		tokens[p.token] = await enrollmentToken(t, p);
 	}
 	await ensureEndpointRule(t);
+	await ensureRuleNamespaces(t);
 }
 upsertEnv('lab/.env', tokens);
 console.log('enrollment tokens: written to lab/.env');

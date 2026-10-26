@@ -33,8 +33,9 @@
   (customer → space, policies, namespaces).
 - Use one namespace per customer in Fleet policies, so alias, DLS and namespace filters
   all line up.
-- Scope each space's detection rules to that customer's namespace; by default they read
-  every customer's data (see [ELASTIC.md](ELASTIC.md#detection-rules-and-spaces)).
+- Set each space's _Included data stream namespaces for rule execution_ to that customer's
+  namespace; otherwise its detection rules read every customer's data (see
+  [ELASTIC.md](ELASTIC.md#detection-rules-and-spaces)).
 
 **Secrets**
 

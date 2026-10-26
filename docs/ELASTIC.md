@@ -102,21 +102,26 @@ filters. Use the `encoded` value from the response as `ELASTIC_API_KEY`.
 A Kibana space scopes rule objects and where their alerts are stored
 (`.alerts-security.alerts-<space>`), not the data a rule reads. Elastic Defend writes to
 `logs-endpoint.*-<namespace>`, and the prebuilt rules read `logs-endpoint.alerts-*`,
-`logs-endpoint.events.process-*` and similar patterns, which match every namespace. In the
-lab, each space's Endpoint Security rule therefore also promoted the other customer's Defend
-alerts (see the table below). A rule always writes to its own space, so with a space per
-customer every rule runs once per space. To keep each copy to its customer:
+`logs-endpoint.events.process-*` and similar patterns, which match every namespace. A rule
+always writes to its own space, so with a space per customer every rule runs once per space.
+
+Limit each space's rules to that customer's namespace with the space's advanced setting
+**Included data stream namespaces for rule execution**
+(`securitySolution:includedDataStreamNamespacesForRuleExecution`, Kibana 9.4+, under Stack
+Management → Advanced Settings → Security Solution). Every detection rule in the space then
+searches only events whose `data_stream.namespace` is listed, up to 50 namespaces. The
+default is empty, which searches every namespace. `lab/setup.mjs` sets it to the tenant's
+namespace in each space.
 
 - Give each customer's agent policies their own namespace (Fleet pre-fills `default` in
-  every space).
-- Restrict each space's rules to that namespace, by index pattern (`logs-endpoint.alerts-contoso`;
-  prebuilt rule customization needs an Enterprise license, and rule upgrades can add patterns
-  back) or by a rule exception `data_stream.namespace is not contoso`.
-- Save or enable each space's rules as a user who can read only that customer's data
-  (for example `*-contoso`). A rule runs with the privileges of the user who last saved or
-  enabled it, so this holds even for a rule someone forgets to restrict.
+  every space), and list it in that space's setting.
+- Documents without a listed `data_stream.namespace`, such as plain indices or shared threat
+  intelligence in another namespace, are not searched in that space.
+- As a second layer, save or enable each space's rules as a user who can read only that
+  customer's data (for example `*-contoso`). A rule runs with the privileges of the user
+  who last saved or enabled it.
 
-The portal filters alerts by space and namespace either way; scoped rules keep the alerts
+The portal filters alerts by space and namespace either way; the setting keeps the alerts
 in Kibana itself correct.
 
 ## Verified against the lab (Elastic 9.5.5)
@@ -124,22 +129,22 @@ in Kibana itself correct.
 Checked on the project's lab stack (`lab/`, see [LAB.md](LAB.md)): real Fleet agents in
 two space-aware tenants, real Endpoint Security rule, portal using per-tenant API keys.
 
-| Item                                              | Result                                                                                                                                                                                                                                     |
-| ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Stack version, Fleet space awareness              | 9.5.5; space awareness on by default; space-scoped Fleet/Kibana URLs work with tenant keys                                                                                                                                                 |
-| `kibana.alert.rule.name` override                 | **Confirmed**: Endpoint Security uses `rule_name_override: message`                                                                                                                                                                        |
-| Source rule identity                              | **Confirmed**: `kibana.alert.rule.uuid` plus `kibana.alert.rule.rule_id`; name resolved via `GET /s/<space>/api/detection_engine/rules?id=`                                                                                                |
-| Closing reason field                              | **Confirmed**: Kibana's status API writes `kibana.alert.workflow_reason` (e.g. `false_positive`)                                                                                                                                           |
-| `data_stream.namespace` on promoted Defend alerts | **Confirmed**: kept on the alert, plus `kibana.alert.original_data_stream.namespace`                                                                                                                                                       |
-| Cross-tenant leak                                 | **Confirmed**: each space's Endpoint Security rule reads `logs-endpoint.alerts-*`, so acme's index held 15 globex alerts and globex's held 45 acme alerts. Namespace filter and DLS hide them; portal totals matched ground truth exactly. |
-| Severity / risk score                             | Mapped by the rule from `event.severity` / `event.risk_score` of the Defend document                                                                                                                                                       |
-| Kibana privileges for the tenant key              | `feature_fleetv2.read`, `feature_fleet.read`, `feature_siemV5.read` (+ `endpoint_list_read`), `feature_securitySolutionRulesV4.read`. Feature ids are versioned; `lab/setup.mjs` picks the newest.                                         |
-| Fleet `withMetrics`                               | **Works only with** read on the tenant's `metrics-elastic_agent.*-<namespace>`; otherwise Fleet returns `metrics: {}`                                                                                                                      |
-| `getStatusSummary`, `showUpgradeable`, tags API   | Work with the tenant key on the space-scoped URL                                                                                                                                                                                           |
-| `available_versions`                              | Needs the space-scoped URL with a tenant key (403 on the global URL)                                                                                                                                                                       |
-| Agent policy name lookup                          | The `ingest-agent-policies.id` kuery matches nothing on space-aware Fleet; the portal lists the space's policies and filters                                                                                                               |
-| Defend unit failure → Fleet status                | **Confirmed**: endpoint unit `FAILED` puts the agent in `degraded` (shown as Unhealthy)                                                                                                                                                    |
-| Memory signature name                             | Per Kibana's generator: `process.Ext.malware_signature.all_names`, not `rule.name`                                                                                                                                                         |
+| Item                                              | Result                                                                                                                                                                                                                                                                                                                                                                                              |
+| ------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Stack version, Fleet space awareness              | 9.5.5; space awareness on by default; space-scoped Fleet/Kibana URLs work with tenant keys                                                                                                                                                                                                                                                                                                          |
+| `kibana.alert.rule.name` override                 | **Confirmed**: Endpoint Security uses `rule_name_override: message`                                                                                                                                                                                                                                                                                                                                 |
+| Source rule identity                              | **Confirmed**: `kibana.alert.rule.uuid` plus `kibana.alert.rule.rule_id`; name resolved via `GET /s/<space>/api/detection_engine/rules?id=`                                                                                                                                                                                                                                                         |
+| Closing reason field                              | **Confirmed**: Kibana's status API writes `kibana.alert.workflow_reason` (e.g. `false_positive`)                                                                                                                                                                                                                                                                                                    |
+| `data_stream.namespace` on promoted Defend alerts | **Confirmed**: kept on the alert, plus `kibana.alert.original_data_stream.namespace`                                                                                                                                                                                                                                                                                                                |
+| Cross-tenant leak                                 | **Confirmed** without the namespace setting: each space's Endpoint Security rule reads `logs-endpoint.alerts-*`, so acme's index held 15 globex alerts and globex's held 45 acme alerts. Namespace filter and DLS hide them; portal totals matched ground truth exactly. With `includedDataStreamNamespacesForRuleExecution` set per space, new alerts of the other tenant were no longer promoted. |
+| Severity / risk score                             | Mapped by the rule from `event.severity` / `event.risk_score` of the Defend document                                                                                                                                                                                                                                                                                                                |
+| Kibana privileges for the tenant key              | `feature_fleetv2.read`, `feature_fleet.read`, `feature_siemV5.read` (+ `endpoint_list_read`), `feature_securitySolutionRulesV4.read`. Feature ids are versioned; `lab/setup.mjs` picks the newest.                                                                                                                                                                                                  |
+| Fleet `withMetrics`                               | **Works only with** read on the tenant's `metrics-elastic_agent.*-<namespace>`; otherwise Fleet returns `metrics: {}`                                                                                                                                                                                                                                                                               |
+| `getStatusSummary`, `showUpgradeable`, tags API   | Work with the tenant key on the space-scoped URL                                                                                                                                                                                                                                                                                                                                                    |
+| `available_versions`                              | Needs the space-scoped URL with a tenant key (403 on the global URL)                                                                                                                                                                                                                                                                                                                                |
+| Agent policy name lookup                          | The `ingest-agent-policies.id` kuery matches nothing on space-aware Fleet; the portal lists the space's policies and filters                                                                                                                                                                                                                                                                        |
+| Defend unit failure → Fleet status                | **Confirmed**: endpoint unit `FAILED` puts the agent in `degraded` (shown as Unhealthy)                                                                                                                                                                                                                                                                                                             |
+| Memory signature name                             | Per Kibana's generator: `process.Ext.malware_signature.all_names`, not `rule.name`                                                                                                                                                                                                                                                                                                                  |
 
 ## Verified on a real Elastic Defend host (Windows Server 2025, Elastic 9.5.5)
 

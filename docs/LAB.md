@@ -15,7 +15,8 @@ An Elastic **9.5.5** stack for this project (trial license) with its own Compose
   | Globex Inc | `globex`     | `globex-endpoints` (`globex`)                | on endpoints    |
 
 - **The prebuilt _Endpoint Security (Elastic Defend)_ rule**, installed and enabled in each
-  space (1-minute interval, 2-minute lookback).
+  space (1-minute interval, 2-minute lookback). Each space's rules are limited to its
+  tenant's namespace (`securitySolution:includedDataStreamNamespacesForRuleExecution`).
 - **Per-tenant read-only API keys** in `secrets/<tenant>/elastic_api_key` for the portal.
 - **Four real Fleet agents** (containers): `ACME-WS-001`, `ACME-WS-002`, `ACME-SRV-001` and
   `GLBX-WS-001`. Defend can't run in a container, so on the Defend policies its component
