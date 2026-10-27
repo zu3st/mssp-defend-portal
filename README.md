@@ -103,24 +103,25 @@ before going live.
 
 ## Configuration
 
-| Variable                             | Required    | Meaning                                                                                                 |
-| ------------------------------------ | ----------- | ------------------------------------------------------------------------------------------------------- |
-| `TENANT_ID`                          | yes         | Portal tenant id; sessions are bound to it                                                              |
-| `TENANT_NAME`                        | –           | Display name                                                                                            |
-| `KIBANA_SPACE_ID`                    | –           | Customer's Kibana space (default: `TENANT_ID`)                                                          |
-| `TENANT_AGENT_POLICY_IDS`            | yes         | Comma-separated Fleet agent policy ids of this customer                                                 |
-| `TENANT_NAMESPACES`                  | yes         | Data stream namespaces of this customer's policies                                                      |
-| `ALERTS_INDEX`                       | –           | Default `.alerts-security.alerts-<space>`                                                               |
-| `DATA_SOURCE`                        | –           | `mock` (default) or `elastic`                                                                           |
-| `ELASTICSEARCH_URL`, `KIBANA_URL`    | elastic     | Elasticsearch and Kibana URLs as the container reaches them                                             |
-| `ELASTIC_API_KEY[_FILE]`             | elastic     | Tenant-specific read-only API key (encoded form)                                                        |
-| `ELASTIC_TIMEOUT_MS`                 | –           | Timeout of each Elastic request, default 10000                                                          |
-| `NODE_EXTRA_CA_CERTS`                | –           | CA bundle for the Elastic TLS certificates                                                              |
-| `SESSION_SECRET[_FILE]`              | yes         | At least 32 characters; unique per container                                                            |
-| `PORTAL_USERS_FILE` / `PORTAL_USERS` | yes         | JSON `{user: scryptHash}` / `user:hash,…`                                                               |
-| `ORIGIN`                             | recommended | Public origin(s), comma-separated, e.g. `https://portal.acme.example`; POSTs must come from one of them |
-| `COOKIE_SECURE`                      | –           | `true` by default; `false` only for local testing over plain HTTP                                       |
-| `SESSION_TTL_SECONDS`                | –           | Default 8 hours                                                                                         |
+| Variable                             | Required     | Meaning                                                                                                 |
+| ------------------------------------ | ------------ | ------------------------------------------------------------------------------------------------------- |
+| `TENANT_ID`                          | yes          | Portal tenant id; sessions are bound to it                                                              |
+| `TENANT_NAME`                        | –            | Display name                                                                                            |
+| `KIBANA_SPACE_ID`                    | –            | Customer's Kibana space (default: `TENANT_ID`)                                                          |
+| `TENANT_AGENT_POLICY_IDS`            | yes          | Comma-separated Fleet agent policy ids of this customer                                                 |
+| `TENANT_NAMESPACES`                  | yes          | Data stream namespaces of this customer's policies                                                      |
+| `ALERTS_INDEX`                       | –            | Default `.alerts-security.alerts-<space>`                                                               |
+| `DATA_SOURCE`                        | –            | `mock` (default) or `elastic`                                                                           |
+| `ELASTICSEARCH_URL`, `KIBANA_URL`    | elastic      | Elasticsearch and Kibana URLs as the container reaches them                                             |
+| `ELASTIC_API_KEY[_FILE]`             | elastic      | Tenant-specific read-only API key (encoded form)                                                        |
+| `ELASTIC_TIMEOUT_MS`                 | –            | Timeout of each Elastic request, default 10000                                                          |
+| `NODE_EXTRA_CA_CERTS`                | –            | CA bundle for the Elastic TLS certificates                                                              |
+| `SESSION_SECRET[_FILE]`              | yes          | At least 32 characters; unique per container                                                            |
+| `PORTAL_USERS_FILE` / `PORTAL_USERS` | yes          | JSON `{user: scryptHash}` / `user:hash,…`                                                               |
+| `ORIGIN`                             | recommended  | Public origin(s), comma-separated, e.g. `https://portal.acme.example`; POSTs must come from one of them |
+| `COOKIE_SECURE`                      | –            | `true` by default; `false` only for local testing over plain HTTP                                       |
+| `SESSION_TTL_SECONDS`                | –            | Default 8 hours                                                                                         |
+| `ADDRESS_HEADER`, `XFF_DEPTH`        | behind proxy | Where the proxy puts the client IP, e.g. `X-Forwarded-For`; failed logins are limited per client IP     |
 
 `/healthz` reports that the portal runs and `/readyz` that it reaches Kibana; both work
 without a login, for health probes.

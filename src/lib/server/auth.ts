@@ -1,4 +1,12 @@
-import { createHmac, randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
+import { createHmac, randomBytes, scrypt, scryptSync, timingSafeEqual } from 'node:crypto';
+import { promisify } from 'node:util';
+
+const scryptAsync = promisify(scrypt) as (
+	password: string,
+	salt: Buffer,
+	keyLen: number,
+	options: { N: number; r: number; p: number }
+) => Promise<Buffer>;
 
 /**
  * Lab authentication: local users with scrypt password hashes and a stateless
@@ -29,11 +37,15 @@ export function hashPassword(password: string): string {
 // Used to equalize timing when the user does not exist.
 const DUMMY_HASH = hashPassword(randomBytes(16).toString('hex'));
 
-export function verifyPassword(password: string, stored: string | undefined): boolean {
+/** Async so a password check does not block other requests while it runs. */
+export async function verifyPassword(
+	password: string,
+	stored: string | undefined
+): Promise<boolean> {
 	const [scheme, n, r, p, salt, hash] = (stored ?? DUMMY_HASH).split('$');
 	if (scheme !== 'scrypt' || !salt || !hash) return false;
 	const expected = Buffer.from(hash, 'base64url');
-	const actual = scryptSync(password, Buffer.from(salt, 'base64url'), expected.length, {
+	const actual = await scryptAsync(password, Buffer.from(salt, 'base64url'), expected.length, {
 		N: Number(n),
 		r: Number(r),
 		p: Number(p)
@@ -81,28 +93,43 @@ export function isSameOrigin(request: Request, origins: string[]): boolean {
 	return request.headers.get('sec-fetch-site') === 'same-origin';
 }
 
-/** Small in-memory limiter for login attempts (per container; fine for one tenant). */
+/**
+ * In-memory login throttle (per container): failed logins per client IP within a
+ * window, and a cap on password checks running at once. Accounts are never locked.
+ */
 export class LoginRateLimiter {
 	private attempts = new Map<string, { count: number; first: number }>();
+	private running = 0;
 	constructor(
-		private max = 10,
-		private windowMs = 15 * 60_000
+		private max = 20,
+		private windowMs = 60_000,
+		private maxConcurrent = 4
 	) {}
 
-	allow(key: string, now = Date.now()): boolean {
-		const a = this.attempts.get(key);
+	allow(ip: string, now = Date.now()): boolean {
+		const a = this.attempts.get(ip);
 		if (!a || now - a.first > this.windowMs) return true;
 		return a.count < this.max;
 	}
 
-	fail(key: string, now = Date.now()) {
-		const a = this.attempts.get(key);
-		if (!a || now - a.first > this.windowMs) this.attempts.set(key, { count: 1, first: now });
+	fail(ip: string, now = Date.now()) {
+		const a = this.attempts.get(ip);
+		if (!a || now - a.first > this.windowMs) this.attempts.set(ip, { count: 1, first: now });
 		else a.count++;
-		if (this.attempts.size > 10_000) this.attempts.clear();
+		if (this.attempts.size > 10_000) {
+			for (const [k, v] of this.attempts)
+				if (now - v.first > this.windowMs) this.attempts.delete(k);
+		}
 	}
 
-	reset(key: string) {
-		this.attempts.delete(key);
+	/** Takes a password-check slot; false when all are busy. Pair with `release`. */
+	acquire(): boolean {
+		if (this.running >= this.maxConcurrent) return false;
+		this.running++;
+		return true;
+	}
+
+	release() {
+		this.running--;
 	}
 }

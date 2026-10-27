@@ -15,7 +15,8 @@
   `search_after` and a point-in-time.
 - **Alert search** uses case-insensitive wildcards over a small fixed field set. It is
   bounded but not tuned for very large indices.
-- **Login rate limiting** is in memory and per container.
+- **Login throttling** is in memory and per container. Behind a proxy it needs
+  `ADDRESS_HEADER` to see client IPs.
 - **Relative times** ("2 minutes ago") change only when the page reloads its data: on
   navigation, Refresh, the time picker's auto-refresh, or the agent pages' 30-second refresh.
 

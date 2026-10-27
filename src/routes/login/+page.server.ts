@@ -21,20 +21,28 @@ export const actions: Actions = {
 			.trim()
 			.slice(0, 100);
 		const password = String(form.get('password') ?? '').slice(0, 256);
-		const key = `${getClientAddress()}|${username.toLowerCase()}`;
+		const ip = getClientAddress();
 
-		if (!limiter.allow(key)) {
+		if (!limiter.allow(ip) || !limiter.acquire()) {
 			return fail(429, {
 				username,
-				message: 'Too many attempts. Please wait a few minutes and try again.'
+				message: 'Too many login attempts. Please wait a minute and try again.'
 			});
 		}
-		if (!username || !password || !verifyPassword(password, config.auth.users.get(username))) {
-			limiter.fail(key);
+		let ok: boolean;
+		try {
+			ok =
+				!!username &&
+				!!password &&
+				(await verifyPassword(password, config.auth.users.get(username)));
+		} finally {
+			limiter.release();
+		}
+		if (!ok) {
+			limiter.fail(ip);
 			console.warn(JSON.stringify({ level: 'warn', msg: 'login failed', user: username }));
 			return fail(400, { username, message: 'Invalid username or password.' });
 		}
-		limiter.reset(key);
 
 		const exp = Math.floor(Date.now() / 1000) + config.auth.sessionTtlSeconds;
 		cookies.set(

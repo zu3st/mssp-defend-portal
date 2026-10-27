@@ -11,11 +11,11 @@ import {
 const SECRET = 'x'.repeat(40);
 
 describe('passwords', () => {
-	it('verifies scrypt hashes', () => {
+	it('verifies scrypt hashes', async () => {
 		const h = hashPassword('correct horse battery');
-		expect(verifyPassword('correct horse battery', h)).toBe(true);
-		expect(verifyPassword('wrong', h)).toBe(false);
-		expect(verifyPassword('anything', undefined)).toBe(false);
+		expect(await verifyPassword('correct horse battery', h)).toBe(true);
+		expect(await verifyPassword('wrong', h)).toBe(false);
+		expect(await verifyPassword('anything', undefined)).toBe(false);
 	});
 });
 
@@ -48,11 +48,21 @@ describe('sessions', () => {
 });
 
 describe('login rate limiter', () => {
-	it('blocks after max failures within the window', () => {
+	it('blocks an IP after max failures within the window', () => {
 		const l = new LoginRateLimiter(3, 1000);
-		for (let i = 0; i < 3; i++) l.fail('k', 0);
-		expect(l.allow('k', 10)).toBe(false);
-		expect(l.allow('k', 2000)).toBe(true);
+		for (let i = 0; i < 3; i++) l.fail('10.0.0.1', 0);
+		expect(l.allow('10.0.0.1', 10)).toBe(false);
+		expect(l.allow('10.0.0.2', 10)).toBe(true);
+		expect(l.allow('10.0.0.1', 2000)).toBe(true);
+	});
+
+	it('caps concurrent password checks', () => {
+		const l = new LoginRateLimiter(3, 1000, 2);
+		expect(l.acquire()).toBe(true);
+		expect(l.acquire()).toBe(true);
+		expect(l.acquire()).toBe(false);
+		l.release();
+		expect(l.acquire()).toBe(true);
 	});
 });
 

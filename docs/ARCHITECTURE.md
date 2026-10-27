@@ -77,8 +77,9 @@ The tests cover each layer:
 
 ## Authentication
 
-- **Built in:** local users (scrypt hashes) from a secrets file. Login is rate-limited
-  per IP and user. The session is a stateless signed cookie (`HttpOnly`, `SameSite=Strict`,
+- **Built in:** local users (scrypt hashes) from a secrets file. Failed logins are limited
+  per client IP (20 per minute) and at most four password checks run at once; accounts are
+  never locked. The session is a stateless signed cookie (`HttpOnly`, `SameSite=Strict`,
   `Secure` unless disabled for testing over plain HTTP).
 - **Production:** replace the login with OIDC/SAML, either in-app or behind an
   authenticating reverse proxy. Map an IdP group or claim to _this_ container's tenant and
