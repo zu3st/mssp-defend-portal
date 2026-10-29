@@ -77,7 +77,8 @@ through the Fleet API can be given a readable id instead.
    docker build -t mssp-defend-portal .
    ```
 
-   The build also runs the type check and the tests.
+   The build also runs the type check and the tests. Alternatively, use the published
+   `ghcr.io/zu3st/mssp-defend-portal` image (see [Releases](#releases)).
 
 5. **Run the customer's container:**
 
@@ -159,6 +160,17 @@ running portals:
 A_USER=acme.analyst A_PASS='…' B_USER=globex.analyst B_PASS='…' ./scripts/e2e-lab.sh
 ```
 
+## Releases
+
+Every push to `main` runs [release.yml](.github/workflows/release.yml): it builds the
+image (including the type check and the tests) and publishes
+`ghcr.io/zu3st/mssp-defend-portal` as `latest` and `sha-<commit>`, with an SBOM and a
+provenance attestation. To check an image:
+
+```bash
+gh attestation verify oci://ghcr.io/zu3st/mssp-defend-portal@sha256:<digest> --owner zu3st
+```
+
 ## Development
 
 Everything runs in Docker; Node is not needed on the host.
@@ -189,6 +201,7 @@ development server for the `acme` customer with generated data on <http://localh
 - `src/lib/server/mock/`: generated Elastic-shaped data for several customers
 - `lab/`: Elastic lab stack, tenant setup and alert feeder
 - `scripts/`: lab secrets, password hashing and HTTP checks
+- `.github/workflows/`: container build and publishing
 - `docs/`: architecture, Elastic APIs and privileges, lab, dependencies, production
   readiness
 

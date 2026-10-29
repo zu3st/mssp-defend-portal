@@ -24,6 +24,16 @@ the **runtime image contains no `node_modules`**.
 | `vitest`                                                            | Unit and isolation tests         | Vitest team (VoidZero), MIT; updated to fix GHSA-qxg6-89mg-rqv8 |
 | `prettier`, `prettier-plugin-svelte`, `prettier-plugin-tailwindcss` | Formatting                       | Prettier org / Svelte team / Tailwind Labs                      |
 
+## Release workflow
+
+[release.yml](../.github/workflows/release.yml) uses these GitHub Actions, each pinned by
+commit SHA:
+
+| Action                                                                                                                                | Used for                                       | Why trusted                           |
+| ------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------- | ------------------------------------- |
+| `actions/checkout` v7.0.1, `actions/attest-build-provenance` v4.2.2                                                                   | Checkout and the signed provenance attestation | Maintained by GitHub                  |
+| `docker/setup-buildx-action` v4.4.1, `docker/login-action` v4.6.0, `docker/metadata-action` v6.2.0, `docker/build-push-action` v7.4.0 | Build, tag and push the image to GHCR          | Official actions maintained by Docker |
+
 ## Deliberately not used
 
 - **`@elastic/elasticsearch`**: the portal needs only `_search`. Node's built-in `fetch`
