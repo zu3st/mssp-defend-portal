@@ -100,17 +100,35 @@ describe('memory / shellcode alert', () => {
 				'kibana.alert.original_event.code': 'shellcode_thread',
 				'kibana.alert.original_event.type': ['info', 'denied'],
 				process: { name: 'rundll32.exe', pid: 10, parent: { name: 'explorer.exe' } },
-				Target: { process: { name: 'svchost.exe', pid: 800 } },
-				Memory_protection: { feature: 'shellcode_thread', self_injection: false }
+				// Shape of the real DC01 alert (Defend 9.5.5).
+				Target: {
+					process: {
+						name: 'notepad.exe',
+						pid: 800,
+						Ext: { memory_region: { region_protection: 'RWX', allocation_type: 'PRIVATE' } },
+						thread: { Ext: { start_address_module: 'Unbacked' } }
+					}
+				},
+				Memory_protection: {
+					feature: 'shellcode_thread',
+					self_injection: false,
+					cross_session: false,
+					parent_to_child: true
+				}
 			})
 		);
 		expect(d.kind).toBe('memory');
 		expect(fields(d)).toMatchObject({
 			'Memory_protection.feature': ['shellcode_thread'],
 			'Memory_protection.self_injection': ['false'],
+			'Memory_protection.cross_session': ['false'],
+			'Memory_protection.parent_to_child': ['true'],
 			'process.name': ['rundll32.exe'],
 			'process.parent.name': ['explorer.exe'],
-			'Target.process.name': ['svchost.exe']
+			'Target.process.name': ['notepad.exe'],
+			'Target.process.Ext.memory_region.region_protection': ['RWX'],
+			'Target.process.Ext.memory_region.allocation_type': ['PRIVATE'],
+			'Target.process.thread.Ext.start_address_module': ['Unbacked']
 		});
 		expect(d.outcome).toBe('prevented');
 	});

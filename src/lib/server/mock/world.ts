@@ -867,6 +867,7 @@ function buildAlert(
 		const shellcode = os === 'windows' ? rng.chance(0.5) : false;
 		const sev: Sev = 'critical';
 		if (shellcode || os !== 'windows') {
+			const injector = rng.int(1000, 15000);
 			return {
 				...endpointBase,
 				message: prevented
@@ -887,7 +888,7 @@ function buildAlert(
 				process: {
 					name: os === 'windows' ? 'rundll32.exe' : 'python3',
 					executable: os === 'windows' ? 'C:\\Windows\\System32\\rundll32.exe' : '/usr/bin/python3',
-					pid: rng.int(1000, 15000),
+					pid: injector,
 					command_line:
 						os === 'windows'
 							? 'rundll32.exe C:\\ProgramData\\upd\\x64.dll,Start'
@@ -895,19 +896,23 @@ function buildAlert(
 					Ext: { user },
 					parent: { name: os === 'windows' ? 'explorer.exe' : 'bash', pid: rng.int(300, 900) }
 				},
+				// As in a real Defend 9.5.5 shellcode-thread alert (lab, Windows Server 2025):
+				// the injector started its target, private RWX memory, unbacked thread start.
 				Target: {
 					process: {
-						name: os === 'windows' ? 'svchost.exe' : 'sshd',
-						pid: rng.int(300, 3000),
-						executable: os === 'windows' ? 'C:\\Windows\\System32\\svchost.exe' : '/usr/sbin/sshd'
+						name: os === 'windows' ? 'notepad.exe' : 'sleep',
+						pid: rng.int(1000, 15000),
+						ppid: injector,
+						executable: os === 'windows' ? 'C:\\Windows\\System32\\notepad.exe' : '/usr/bin/sleep',
+						Ext: { memory_region: { region_protection: 'RWX', allocation_type: 'PRIVATE' } },
+						thread: { Ext: { start_address_module: 'Unbacked' } }
 					}
 				},
-				// As in a real Defend 9.5.5 shellcode-thread alert (lab, Windows Server 2025).
 				Memory_protection: {
 					feature: 'shellcode_thread',
 					self_injection: false,
-					cross_session: rng.chance(0.2),
-					parent_to_child: false
+					cross_session: false,
+					parent_to_child: true
 				}
 			};
 		}

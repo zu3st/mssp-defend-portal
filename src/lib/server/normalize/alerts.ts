@@ -38,6 +38,8 @@ const HIGHLIGHTED_BY_KIND: Record<AlertKind, string[]> = {
 	memory: [
 		'Memory_protection.feature',
 		'Memory_protection.self_injection',
+		'Memory_protection.cross_session',
+		'Memory_protection.parent_to_child',
 		'process.Ext.malware_signature.all_names',
 		'process.name',
 		'process.executable',
@@ -45,7 +47,9 @@ const HIGHLIGHTED_BY_KIND: Record<AlertKind, string[]> = {
 		'process.parent.name',
 		'Target.process.name',
 		'Target.process.executable',
-		'Target.process.thread.Ext.start_address_details.region_protection'
+		'Target.process.Ext.memory_region.region_protection',
+		'Target.process.Ext.memory_region.allocation_type',
+		'Target.process.thread.Ext.start_address_module'
 	],
 	ransomware: [
 		'Ransomware.feature',

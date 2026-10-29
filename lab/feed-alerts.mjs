@@ -116,6 +116,7 @@ function memory(a, ts, prevented, shellcode) {
 		'Windows.Trojan.Metasploit',
 		'Windows.Hacktool.Mimikatz'
 	]);
+	const injector = 4000 + Math.floor(Math.random() * 4000);
 	return {
 		...id,
 		message: shellcode
@@ -137,11 +138,11 @@ function memory(a, ts, prevented, shellcode) {
 					feature: 'shellcode_thread',
 					self_injection: false,
 					cross_session: false,
-					parent_to_child: false
+					parent_to_child: true
 				}
 			: { feature: 'signature', self_injection: true },
 		process: {
-			pid: 4000 + Math.floor(Math.random() * 4000),
+			pid: injector,
 			entity_id: hex(16),
 			name: shellcode ? 'rundll32.exe' : 'powershell.exe',
 			executable: shellcode
@@ -164,14 +165,12 @@ function memory(a, ts, prevented, shellcode) {
 			? {
 					Target: {
 						process: {
-							name: 'svchost.exe',
-							pid: 900,
-							executable: 'C:\\Windows\\System32\\svchost.exe',
-							thread: {
-								Ext: {
-									start_address_details: { allocation_type: 'PRIVATE', region_protection: 'RWX' }
-								}
-							}
+							name: 'notepad.exe',
+							pid: 4000 + Math.floor(Math.random() * 4000),
+							ppid: injector,
+							executable: 'C:\\Windows\\System32\\notepad.exe',
+							Ext: { memory_region: { region_protection: 'RWX', allocation_type: 'PRIVATE' } },
+							thread: { Ext: { start_address_module: 'Unbacked' } }
 						}
 					}
 				}
