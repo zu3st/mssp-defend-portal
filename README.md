@@ -43,8 +43,10 @@ passes on only the fields it shows, such as the highlighted fields of each detec
 
 ## Setting up a customer
 
-The steps use a customer `contoso` with the space, namespace and agent policy id
-`contoso`.
+The steps use a customer `contoso` with the space and namespace `contoso` and one agent
+policy. Fleet gives a policy created in Kibana a UUID as its id; it is the last part of the
+policy's URL in Fleet and the `id` in `GET /api/fleet/agent_policies`. A policy created
+through the Fleet API can be given a readable id instead.
 
 1. **Create the customer's API key** with the request in
    [docs/ELASTIC.md](docs/ELASTIC.md#per-tenant-api-key), and save the `encoded` value as
@@ -84,7 +86,7 @@ The steps use a customer `contoso` with the space, namespace and agent policy id
      --security-opt no-new-privileges -p 127.0.0.1:3201:3000 \
      -v "$PWD/secrets/contoso:/run/secrets:ro" \
      -e TENANT_ID=contoso -e TENANT_NAME='Contoso Ltd' \
-     -e TENANT_AGENT_POLICY_IDS=contoso -e TENANT_NAMESPACES=contoso \
+     -e TENANT_AGENT_POLICY_IDS=4f9c2b1e-7d3a-4c8e-9b6f-2a1d5e8c7f30 -e TENANT_NAMESPACES=contoso \
      -e DATA_SOURCE=elastic \
      -e ELASTICSEARCH_URL=https://elasticsearch.example:9200 \
      -e KIBANA_URL=https://kibana.example:5601 \
@@ -108,7 +110,7 @@ before going live.
 | `TENANT_ID`                          | yes          | Portal tenant id; sessions are bound to it                                                              |
 | `TENANT_NAME`                        | –            | Display name                                                                                            |
 | `KIBANA_SPACE_ID`                    | –            | Customer's Kibana space (default: `TENANT_ID`)                                                          |
-| `TENANT_AGENT_POLICY_IDS`            | yes          | Comma-separated Fleet agent policy ids of this customer                                                 |
+| `TENANT_AGENT_POLICY_IDS`            | yes          | Comma-separated Fleet agent policy ids (UUIDs unless set via the API)                                   |
 | `TENANT_NAMESPACES`                  | yes          | Data stream namespaces of this customer's policies                                                      |
 | `ALERTS_INDEX`                       | –            | Default `.alerts-security.alerts-<space>`                                                               |
 | `DATA_SOURCE`                        | –            | `mock` (default) or `elastic`                                                                           |
