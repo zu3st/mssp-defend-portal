@@ -33,9 +33,8 @@ export const handle: Handle = async ({ event, resolve }) => {
 		}
 	}
 
-	// Language: the user's choice, else what the browser asks for.
+	// Language: the user's choice, else the first one the browser asks for that the portal has.
 	const langCookie = event.cookies.get(LOCALE_COOKIE);
-	event.locals.localePref = isLocale(langCookie) ? langCookie : 'system';
 	event.locals.locale = isLocale(langCookie)
 		? langCookie
 		: negotiate(parseAcceptLanguage(event.request.headers.get('accept-language')));

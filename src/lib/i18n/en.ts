@@ -23,10 +23,7 @@ export const en = {
 		light: 'light',
 		dark: 'dark'
 	},
-	language: {
-		label: 'Language',
-		system: 'System'
-	},
+	language: { label: 'Language' },
 	auth: {
 		signIn: 'Sign in',
 		signingIn: 'Signing in…',

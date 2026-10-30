@@ -151,7 +151,7 @@
 								size={15}
 							/>{:else}<SunMoon size={15} />{/if}
 					</button>
-					<LanguagePicker pref={data.localePref} />
+					<LanguagePicker />
 					<span class="hidden text-[13px] text-muted sm:inline">{data.user}</span>
 					<form method="POST" action="/logout">
 						<button

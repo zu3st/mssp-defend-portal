@@ -10,8 +10,6 @@ import { en, type Messages } from './en.ts';
  */
 export const LOCALES = ['en', 'de'] as const;
 export type Locale = (typeof LOCALES)[number];
-/** The user's choice: a language, or whatever the browser prefers. */
-export type LocalePref = Locale | 'system';
 
 export const LOCALE_COOKIE = 'lang';
 /** Language names, always in their own language. */

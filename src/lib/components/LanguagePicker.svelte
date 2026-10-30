@@ -6,30 +6,21 @@
 		LOCALE_NAMES,
 		LOCALES,
 		locale,
-		negotiate,
 		setLocale,
 		t,
-		type LocalePref
+		type Locale
 	} from '#lib/i18n/index.svelte.ts';
 	import { Check, Languages } from '@lucide/svelte';
 
 	/**
-	 * Language menu beside the theme toggle. "System" (the default) follows the
-	 * browser's languages; a chosen language is kept in a cookie.
+	 * Language menu beside the theme toggle. Until the user picks one, the
+	 * server uses the browser's first supported language; a pick is kept in a
+	 * cookie.
 	 */
-	let { pref }: { pref: LocalePref } = $props();
-
 	let el: HTMLDetailsElement | undefined = $state();
-	let chosen: LocalePref = $derived(pref);
-	const OPTIONS: LocalePref[] = ['system', ...LOCALES];
 
-	function choose(p: LocalePref) {
-		chosen = p;
-		document.cookie =
-			p === 'system'
-				? `${LOCALE_COOKIE}=; path=/; max-age=0; samesite=lax`
-				: `${LOCALE_COOKIE}=${p}; path=/; max-age=31536000; samesite=lax`;
-		const l = p === 'system' ? negotiate(navigator.languages) : p;
+	function choose(l: Locale) {
+		document.cookie = `${LOCALE_COOKIE}=${l}; path=/; max-age=31536000; samesite=lax`;
 		setLocale(l);
 		document.documentElement.lang = l;
 		if (el) el.open = false;
@@ -49,15 +40,15 @@
 		<span class="hidden text-[11px] font-semibold uppercase sm:inline">{locale()}</span>
 	</summary>
 	<div class="card absolute top-full right-0 z-30 mt-1 min-w-36 p-1 text-[13px] shadow-lg">
-		{#each OPTIONS as p (p)}
+		{#each LOCALES as l (l)}
 			<button
 				type="button"
 				class="flex w-full items-center gap-2 rounded px-2.5 py-1.5 text-left hover:bg-surface-2"
-				aria-pressed={chosen === p}
-				onclick={() => choose(p)}
+				aria-pressed={locale() === l}
+				onclick={() => choose(l)}
 			>
-				<Check size={14} class={chosen === p ? 'text-accent' : 'invisible'} />
-				{p === 'system' ? t().language.system : LOCALE_NAMES[p]}
+				<Check size={14} class={locale() === l ? 'text-accent' : 'invisible'} />
+				{LOCALE_NAMES[l]}
 			</button>
 		{/each}
 	</div>

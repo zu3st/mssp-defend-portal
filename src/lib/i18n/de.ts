@@ -23,10 +23,7 @@ export const de: Messages = {
 		light: 'Hell',
 		dark: 'Dunkel'
 	},
-	language: {
-		label: 'Sprache',
-		system: 'System'
-	},
+	language: { label: 'Sprache' },
 	auth: {
 		signIn: 'Anmelden',
 		signingIn: 'Anmeldung läuft…',

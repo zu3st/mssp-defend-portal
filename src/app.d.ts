@@ -5,9 +5,8 @@ declare global {
 			/** Authenticated portal user, if any. Tenant is fixed per container. */
 			user?: string;
 			tenantName: string;
-			/** UI language of this request, and whether the user chose it or it follows the browser. */
+			/** UI language of this request. */
 			locale: import('#lib/i18n/index.svelte.ts').Locale;
-			localePref: import('#lib/i18n/index.svelte.ts').LocalePref;
 		}
 		interface PageState {
 			/** Alert shown in the side panel (shallow routing). */
