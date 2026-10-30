@@ -5,6 +5,7 @@
 	import SortHeader from '../SortHeader.svelte';
 	import RelTime from '../RelTime.svelte';
 	import RowMenu from '../RowMenu.svelte';
+	import { t } from '#lib/i18n/index.svelte.ts';
 
 	let {
 		items,
@@ -15,7 +16,7 @@
 		showHost = true,
 		sortable = true,
 		clearHref,
-		emptyText = 'No detections match the filters in this time range.'
+		emptyText = t().detections.noMatch
 	}: {
 		items: AlertSummary[];
 		selected: string | null;
@@ -55,14 +56,14 @@
 		</colgroup>
 		<thead>
 			<tr>
-				<th>{@render head('timestamp', 'Time', 'desc')}</th>
-				<th>{@render head('severity', 'Severity', 'desc')}</th>
-				<th>{@render head('ruleName', 'Detection')}</th>
-				{#if showHost}<th>{@render head('hostname', 'Host')}</th>{/if}
-				<th>User</th>
-				<th>Outcome</th>
-				<th>{@render head('status', 'Status')}</th>
-				<th class="w-10"><span class="sr-only">Actions</span></th>
+				<th>{@render head('timestamp', t().detections.time, 'desc')}</th>
+				<th>{@render head('severity', t().detections.severity, 'desc')}</th>
+				<th>{@render head('ruleName', t().detections.detection)}</th>
+				{#if showHost}<th>{@render head('hostname', t().detections.host)}</th>{/if}
+				<th>{t().detections.user}</th>
+				<th>{t().detections.outcome}</th>
+				<th>{@render head('status', t().detections.status)}</th>
+				<th class="w-10"><span class="sr-only">{t().common.actions}</span></th>
 			</tr>
 		</thead>
 		<tbody>
@@ -86,7 +87,7 @@
 						<!-- The type is a fixed enum and always shown in full; only the file or
 						     process name after it may shorten. -->
 						<div class="flex min-w-0 text-[12px] leading-4 text-muted">
-							<span class="shrink-0">{kindLabel[a.kind]}</span>
+							<span class="shrink-0">{kindLabel(a.kind)}</span>
 							{#if a.subject}<span class="truncate" title={a.subject}>&nbsp;·&nbsp;{a.subject}</span
 								>{/if}
 						</div>
@@ -111,16 +112,21 @@
 							<StatusBadge kind="workflow" value={a.status} />
 						</div>
 						{#if a.closingReason}<div class="pl-[21px] text-[12px] leading-4 text-muted">
-								{closingReasonLabel[a.closingReason] ?? a.closingReason}
+								{closingReasonLabel(a.closingReason)}
 							</div>{/if}
 					</td>
 					<td class="py-0">
 						<RowMenu
-							label={`Actions for ${a.title}`}
+							label={t().common.actionsFor(a.title)}
 							actions={[
-								{ label: 'View details', onclick: () => onselect(a.id) },
-								...(a.agentId ? [{ label: 'View agent', href: `/agents/${a.agentId}` }] : []),
-								{ label: 'Copy alert ID', onclick: () => navigator.clipboard?.writeText(a.id) }
+								{ label: t().detections.viewDetails, onclick: () => onselect(a.id) },
+								...(a.agentId
+									? [{ label: t().detections.viewAgent, href: `/agents/${a.agentId}` }]
+									: []),
+								{
+									label: t().detections.copyAlertId,
+									onclick: () => navigator.clipboard?.writeText(a.id)
+								}
 							]}
 						/>
 					</td>
@@ -130,7 +136,9 @@
 					<td colspan="8" class="py-10 text-center text-muted">
 						{emptyText}
 						{#if clearHref}
-							<a href={clearHref} class="ml-1 text-accent hover:underline">Clear filters</a>
+							<a href={clearHref} class="ml-1 text-accent hover:underline"
+								>{t().common.clearFilters}</a
+							>
 						{/if}
 					</td>
 				</tr>

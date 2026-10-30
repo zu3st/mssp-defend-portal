@@ -8,6 +8,7 @@ import type {
 	WorkflowStatus
 } from '#lib/contract.ts';
 import { FLEET_STATUS_GROUPS } from '#lib/contract.ts';
+import { INTL_TAG, locale, num, t } from '#lib/i18n/index.svelte.ts';
 
 export type Tone =
 	'ok' | 'warn' | 'bad' | 'info' | 'neutral' | 'critical' | 'high' | 'medium' | 'low';
@@ -29,50 +30,59 @@ export interface Label {
 	tone: Tone;
 }
 
-export const severityLabel = (s: Severity): Label => ({
-	label: s[0].toUpperCase() + s.slice(1),
-	tone: s
-});
+/** Labels in the current language: `label` is read when shown, so it follows a language switch. */
+function labels<K extends string>(
+	tones: Record<K, Tone>,
+	text: () => Record<K, string>
+): Record<K, Label> {
+	return Object.fromEntries(
+		(Object.entries(tones) as [K, Tone][]).map(([k, tone]) => [
+			k,
+			{
+				tone,
+				get label() {
+					return text()[k];
+				}
+			}
+		])
+	) as Record<K, Label>;
+}
 
-export const workflowLabel: Record<WorkflowStatus, Label> = {
-	open: { label: 'Open', tone: 'bad' },
-	acknowledged: { label: 'Acknowledged', tone: 'warn' },
-	closed: { label: 'Closed', tone: 'neutral' }
-};
+const severityLabels = labels<Severity>(
+	{ critical: 'critical', high: 'high', medium: 'medium', low: 'low' },
+	() => t().severity
+);
+export const severityLabel = (s: Severity): Label => severityLabels[s];
 
-export const closingReasonLabel: Record<string, string> = {
-	false_positive: 'False positive',
-	true_positive: 'True positive',
-	benign_positive: 'Benign positive',
-	duplicate: 'Duplicate',
-	other: 'Other'
-};
+export const workflowLabel = labels<WorkflowStatus>(
+	{ open: 'bad', acknowledged: 'warn', closed: 'neutral' },
+	() => t().workflow
+);
 
-export const outcomeLabel: Record<AlertOutcome, Label> = {
-	prevented: { label: 'Prevented', tone: 'ok' },
-	detected: { label: 'Detected only', tone: 'warn' },
-	unknown: { label: 'Not reported', tone: 'neutral' }
-};
+/** Kibana's closing reasons; unknown ones are shown as stored. */
+export const closingReasonLabel = (reason: string): string => t().closingReason[reason] ?? reason;
 
-export const kindLabel: Record<AlertKind, string> = {
-	malware: 'Malicious file',
-	memory: 'Memory threat',
-	ransomware: 'Ransomware',
-	behavior: 'Malicious behavior',
-	rule: 'Detection rule'
-};
+export const outcomeLabel = labels<AlertOutcome>(
+	{ prevented: 'ok', detected: 'warn', unknown: 'neutral' },
+	() => t().outcome
+);
+
+export const kindLabel = (k: AlertKind): string => t().kind[k];
 
 /** Kibana Fleet agent status badges (Fleet → Agents). */
-export const fleetGroupLabel: Record<FleetStatusGroup, Label> = {
-	healthy: { label: 'Healthy', tone: 'ok' },
-	unhealthy: { label: 'Unhealthy', tone: 'warn' },
-	orphaned: { label: 'Orphaned', tone: 'warn' },
-	updating: { label: 'Updating', tone: 'info' },
-	offline: { label: 'Offline', tone: 'neutral' },
-	inactive: { label: 'Inactive', tone: 'neutral' },
-	unenrolled: { label: 'Unenrolled', tone: 'neutral' },
-	uninstalled: { label: 'Uninstalled', tone: 'neutral' }
-};
+export const fleetGroupLabel = labels<FleetStatusGroup>(
+	{
+		healthy: 'ok',
+		unhealthy: 'warn',
+		orphaned: 'warn',
+		updating: 'info',
+		offline: 'neutral',
+		inactive: 'neutral',
+		unenrolled: 'neutral',
+		uninstalled: 'neutral'
+	},
+	() => t().fleet
+);
 
 /** Badge for a raw Fleet status: Fleet shows the grouped status (degraded -> Unhealthy). */
 export const fleetLabel = Object.fromEntries(
@@ -83,49 +93,70 @@ export const fleetLabel = Object.fromEntries(
 
 /** Fleet shows memory in MB and CPU as a percentage. */
 export function formatMemory(bytes: number | undefined): string {
-	return bytes === undefined ? 'N/A' : `${Math.round(bytes / (1024 * 1024))} MB`;
+	return bytes === undefined ? t().common.na : `${num(Math.round(bytes / (1024 * 1024)))} MB`;
 }
 export function formatCpu(percent: number | undefined): string {
-	return percent === undefined ? 'N/A' : `${percent.toFixed(2)} %`;
+	return percent === undefined ? t().common.na : `${fixed2().format(percent)} %`;
 }
 
 /** Kibana Security → Endpoints "Policy status" wording. */
-export const policyLabel: Record<PolicyStatus, Label> = {
-	success: { label: 'Success', tone: 'ok' },
-	warning: { label: 'Warning', tone: 'warn' },
-	failure: { label: 'Failure', tone: 'bad' },
-	unknown: { label: 'Unknown', tone: 'neutral' },
-	not_installed: { label: 'Not installed', tone: 'neutral' }
-};
+export const policyLabel = labels<PolicyStatus>(
+	{
+		success: 'ok',
+		warning: 'warn',
+		failure: 'bad',
+		unknown: 'neutral',
+		not_installed: 'neutral'
+	},
+	() => t().policy
+);
 
-const rtf = new Intl.RelativeTimeFormat('en', { numeric: 'auto' });
+/** One Intl formatter per language, made on first use. */
+function perLocale<F>(make: (tag: string) => F): () => F {
+	const made = new Map<string, F>();
+	return () => {
+		const tag = INTL_TAG[locale()];
+		let f = made.get(tag);
+		if (!f) made.set(tag, (f = make(tag)));
+		return f;
+	};
+}
+
+const fixed2 = perLocale(
+	(tag) => new Intl.NumberFormat(tag, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+);
+const rtf = perLocale((tag) => new Intl.RelativeTimeFormat(tag, { numeric: 'auto' }));
 
 export function relativeTime(iso: string | undefined, now = Date.now()): string {
 	if (!iso) return '—';
 	const diff = (Date.parse(iso) - now) / 1000;
 	const abs = Math.abs(diff);
-	if (abs < 60) return 'just now';
-	if (abs < 3600) return rtf.format(Math.round(diff / 60), 'minute');
-	if (abs < 86400) return rtf.format(Math.round(diff / 3600), 'hour');
-	if (abs < 86400 * 30) return rtf.format(Math.round(diff / 86400), 'day');
+	if (abs < 60) return t().common.justNow;
+	if (abs < 3600) return rtf().format(Math.round(diff / 60), 'minute');
+	if (abs < 86400) return rtf().format(Math.round(diff / 3600), 'hour');
+	if (abs < 86400 * 30) return rtf().format(Math.round(diff / 86400), 'day');
 	// Older: the date alone, so it fits wherever a relative time does.
 	return formatDay(iso);
 }
 
-const dtf = new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeStyle: 'short' });
-const dtfSec = new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeStyle: 'medium' });
-const dtfDay = new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium' });
+const dtf = perLocale(
+	(tag) => new Intl.DateTimeFormat(tag, { dateStyle: 'medium', timeStyle: 'short' })
+);
+const dtfSec = perLocale(
+	(tag) => new Intl.DateTimeFormat(tag, { dateStyle: 'medium', timeStyle: 'medium' })
+);
+const dtfDay = perLocale((tag) => new Intl.DateTimeFormat(tag, { dateStyle: 'medium' }));
 
 function formatDay(iso: string | undefined): string {
 	if (!iso) return '—';
 	const d = new Date(iso);
-	return Number.isNaN(d.getTime()) ? '—' : dtfDay.format(d);
+	return Number.isNaN(d.getTime()) ? '—' : dtfDay().format(d);
 }
 
 export function formatDate(iso: string | undefined, seconds = false): string {
 	if (!iso) return '—';
 	const d = new Date(iso);
-	return Number.isNaN(d.getTime()) ? '—' : (seconds ? dtfSec : dtf).format(d);
+	return Number.isNaN(d.getTime()) ? '—' : (seconds ? dtfSec() : dtf()).format(d);
 }
 
 /** Component states from worst to best, as Elastic Agent reports them. */
@@ -151,7 +182,9 @@ export function stripStatusPrefix(message: string): string {
 
 /** "Degraded · kernel driver failed to load", or just "Healthy". */
 export function componentLine(status: string, message?: string): string {
-	const label = status.charAt(0).toUpperCase() + status.slice(1).toLowerCase();
+	const label =
+		t().component[status.toUpperCase()] ??
+		status.charAt(0).toUpperCase() + status.slice(1).toLowerCase();
 	const rest = message ? stripStatusPrefix(message) : '';
 	return rest && rest.toLowerCase() !== status.toLowerCase() ? `${label} · ${rest}` : label;
 }
@@ -161,6 +194,9 @@ export interface IntegrationRow {
 	status: string;
 	message?: string;
 }
+
+/** Display name of an integration row; product names stay as they are. */
+export const integrationName = (name: string): string => t().integration[name] ?? name;
 
 /**
  * Groups an agent's components into rows a customer recognises. Components do

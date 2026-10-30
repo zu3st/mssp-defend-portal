@@ -17,6 +17,7 @@
 		type RangeSpec,
 		type Unit
 	} from '#lib/range.ts';
+	import { t } from '#lib/i18n/index.svelte.ts';
 	import { CalendarDays, ChevronDown, Pause, Play, RotateCw } from '@lucide/svelte';
 
 	/**
@@ -85,8 +86,6 @@
 		refreshing = false;
 	}
 
-	const UNIT_OPTIONS = Object.entries(UNITS) as [Unit, string][];
-
 	// Auto-refresh ("Refresh every"), in seconds; null = off.
 	const STORE = 'portal.autoRefresh';
 	const REFRESH_UNITS = { s: 1, m: 60, h: 3600 } as const;
@@ -130,7 +129,7 @@
 
 <div class="flex items-center gap-1">
 	<details class="relative" bind:this={el} use:closeOnOutsideClick ontoggle={onToggle}>
-		<summary class="btn h-8 cursor-pointer list-none" aria-label="Time range">
+		<summary class="btn h-8 cursor-pointer list-none" aria-label={t().range.label}>
 			<CalendarDays size={15} class="text-muted" />
 			<span class="whitespace-nowrap">{rangeLabel(value)}</span>
 			<ChevronDown size={14} class="opacity-60" />
@@ -145,31 +144,33 @@
 					apply(validSpec({ key: `${quickN}${quickUnit}` }), 'quick');
 				}}
 			>
-				<div class="text-[11px] font-semibold tracking-wide text-muted uppercase">Quick select</div>
+				<div class="text-[11px] font-semibold tracking-wide text-muted uppercase">
+					{t().range.quickSelect}
+				</div>
 				<div class="flex items-center gap-2">
-					<span class="text-muted">Last</span>
+					<span class="text-muted">{t().range.last}</span>
 					<input
 						class="input h-8 w-16"
 						type="number"
 						min="1"
 						max="999"
 						required
-						aria-label="Amount"
+						aria-label={t().range.amount}
 						bind:value={quickN}
 					/>
-					<select class="input h-8 flex-1" aria-label="Unit" bind:value={quickUnit}>
-						{#each UNIT_OPTIONS as [u, name] (u)}<option value={u}>{name}s</option>{/each}
+					<select class="input h-8 flex-1" aria-label={t().range.unit} bind:value={quickUnit}>
+						{#each UNITS as u (u)}<option value={u}>{t().range.units[u]}</option>{/each}
 					</select>
-					<button class="btn btn-primary h-8" type="submit">Apply</button>
+					<button class="btn btn-primary h-8" type="submit">{t().common.apply}</button>
 				</div>
 				{#if tooLong === 'quick'}<p class="text-[12px] text-[var(--bad)]">
-						Up to {MAX_RANGE_DAYS} days.
+						{t().range.upTo(MAX_RANGE_DAYS)}
 					</p>{/if}
 			</form>
 
 			<div class="space-y-1.5">
 				<div class="text-[11px] font-semibold tracking-wide text-muted uppercase">
-					Commonly used
+					{t().range.commonlyUsed}
 				</div>
 				<ul class="grid grid-cols-2 gap-x-4 gap-y-1">
 					{#each COMMONLY_USED as key (key)}
@@ -196,13 +197,15 @@
 					apply(validSpec({ key: 'custom', from: customFrom, to: customTo }), 'custom');
 				}}
 			>
-				<div class="text-[11px] font-semibold tracking-wide text-muted uppercase">Custom range</div>
+				<div class="text-[11px] font-semibold tracking-wide text-muted uppercase">
+					{t().range.customRange}
+				</div>
 				<div class="flex items-center gap-2">
 					<input
 						class="input h-8 min-w-0 flex-1"
 						type="date"
 						required
-						aria-label="From date"
+						aria-label={t().range.fromDate}
 						max={customTo || undefined}
 						bind:value={customFrom}
 					/>
@@ -211,14 +214,14 @@
 						class="input h-8 min-w-0 flex-1"
 						type="date"
 						required
-						aria-label="To date"
+						aria-label={t().range.toDate}
 						min={customFrom || undefined}
 						bind:value={customTo}
 					/>
-					<button class="btn btn-primary h-8" type="submit">Apply</button>
+					<button class="btn btn-primary h-8" type="submit">{t().common.apply}</button>
 				</div>
 				{#if tooLong === 'custom'}<p class="text-[12px] text-[var(--bad)]">
-						Up to {MAX_RANGE_DAYS} days.
+						{t().range.upTo(MAX_RANGE_DAYS)}
 					</p>{/if}
 			</form>
 
@@ -230,7 +233,7 @@
 				}}
 			>
 				<div class="text-[11px] font-semibold tracking-wide text-muted uppercase">
-					Refresh every
+					{t().range.refreshEvery}
 				</div>
 				<div class="flex items-center gap-2">
 					<input
@@ -239,22 +242,25 @@
 						min="1"
 						max="999"
 						required
-						aria-label="Refresh interval"
+						aria-label={t().range.refreshInterval}
 						bind:value={refreshN}
 					/>
-					<select class="input h-8 flex-1" aria-label="Refresh unit" bind:value={refreshUnit}>
-						<option value="s">seconds</option>
-						<option value="m">minutes</option>
-						<option value="h">hours</option>
+					<select
+						class="input h-8 flex-1"
+						aria-label={t().range.refreshUnit}
+						bind:value={refreshUnit}
+					>
+						<option value="s">{t().range.seconds}</option>
+						<option value="m">{t().range.minutes}</option>
+						<option value="h">{t().range.hours}</option>
 					</select>
 					<button class="btn h-8 w-[5.5rem] justify-center" type="submit">
-						{#if autoSec === refreshSec}<Pause size={14} /> Stop{:else}<Play size={14} /> Start{/if}
+						{#if autoSec === refreshSec}<Pause size={14} />
+							{t().range.stop}{:else}<Play size={14} /> {t().range.start}{/if}
 					</button>
 				</div>
 				<p class="text-[12px] text-muted">
-					{autoSec
-						? `On, every ${short(autoSec)}. Waits while you're reading a detection.`
-						: `Off. At least ${MIN_REFRESH} seconds.`}
+					{autoSec ? t().range.autoOn(short(autoSec)) : t().range.autoOff(MIN_REFRESH)}
 				</p>
 			</form>
 		</div>
@@ -263,8 +269,8 @@
 		class={['btn h-8 justify-center', autoSec ? 'px-2 text-accent' : 'w-8 p-0']}
 		onclick={refresh}
 		disabled={refreshing}
-		aria-label={autoSec ? `Refresh (auto every ${short(autoSec)})` : 'Refresh'}
-		title={autoSec ? `Refresh · auto every ${short(autoSec)}` : 'Refresh'}
+		aria-label={autoSec ? t().range.refreshAuto(short(autoSec)) : t().range.refresh}
+		title={autoSec ? t().range.refreshAuto(short(autoSec)) : t().range.refresh}
 	>
 		<RotateCw size={14} class={refreshing ? 'animate-spin' : ''} />
 		{#if autoSec}<span class="text-[12px] tabular-nums">{short(autoSec)}</span>{/if}

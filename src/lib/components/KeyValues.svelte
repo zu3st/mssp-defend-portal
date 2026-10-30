@@ -12,6 +12,7 @@
 
 <script lang="ts">
 	import CopyButton from './CopyButton.svelte';
+	import { num, t } from '#lib/i18n/index.svelte.ts';
 
 	let { items, title }: { items: KV[]; title?: string } = $props();
 
@@ -19,7 +20,13 @@
 		items.filter((i) => (i.value !== undefined && i.value !== null && i.value !== '') || i.expected)
 	);
 	const fmt = (v: KV['value']) =>
-		typeof v === 'boolean' ? (v ? 'Yes' : 'No') : typeof v === 'number' ? v.toLocaleString() : v;
+		typeof v === 'boolean'
+			? v
+				? t().common.yes
+				: t().common.no
+			: typeof v === 'number'
+				? num(v)
+				: v;
 </script>
 
 {#if rows.length}
@@ -32,13 +39,13 @@
 				<dt class="text-muted">{r.label}</dt>
 				<dd class={['min-w-0', !r.id && 'break-words', (r.mono || r.id) && 'mono']}>
 					{#if r.value === undefined || r.value === null || r.value === ''}
-						<span class="text-muted italic">Not available</span>
+						<span class="text-muted italic">{t().common.notAvailable}</span>
 					{:else if r.id}
 						{@const v = String(r.value)}
 						<span class="flex max-w-full items-center gap-1.5">
 							<!-- Never break a hash mid-string; scroll only on very narrow screens. -->
 							<span class="min-w-0 overflow-x-auto whitespace-nowrap">{v}</span>
-							<CopyButton value={v} label={`Copy ${r.label}`} />
+							<CopyButton value={v} label={t().common.copyThing(r.label)} />
 						</span>
 					{:else}
 						{fmt(r.value)}

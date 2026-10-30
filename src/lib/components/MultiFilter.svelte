@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { closeOnOutsideClick } from '#lib/actions.ts';
+	import { t } from '#lib/i18n/index.svelte.ts';
 	import { ChevronDown, Search } from '@lucide/svelte';
 
 	/**
@@ -35,14 +36,18 @@
 
 	const summary = $derived(
 		selected.length === 0
-			? 'All'
+			? t().common.all
 			: selected.length === 1
 				? (options.find((o) => o.value === selected[0])?.label ?? selected[0])
-				: `${selected.length} selected`
+				: t().common.selected(selected.length)
 	);
 
 	const sizers = $derived([
-		...new Set(['All', `${Math.max(options.length, 2)} selected`, ...options.map((o) => o.label)])
+		...new Set([
+			t().common.all,
+			t().common.selected(Math.max(options.length, 2)),
+			...options.map((o) => o.label)
+		])
 	]);
 
 	function onToggle() {
@@ -78,7 +83,7 @@
 	>
 		{#if searchable}
 			<label class="relative mb-1 block">
-				<span class="sr-only">Filter {label.toLowerCase()}</span>
+				<span class="sr-only">{t().common.filterPlaceholder(label)}</span>
 				<Search
 					size={13}
 					class="pointer-events-none absolute top-1/2 left-2 -translate-y-1/2 text-muted"
@@ -86,7 +91,7 @@
 				<!-- Unnamed and data-nosubmit: never sent, never triggers the form. -->
 				<input
 					class="input h-7 w-full pl-7"
-					placeholder={`Filter ${label.toLowerCase()}…`}
+					placeholder={t().common.filterPlaceholder(label)}
 					bind:value={filter}
 					data-nosubmit
 					onkeydown={(e) => e.key === 'Enter' && e.preventDefault()}
@@ -111,7 +116,7 @@
 					<span class={freeText ? 'truncate' : 'whitespace-nowrap'}>{o.label}</span>
 				</label>
 			{:else}
-				<div class="px-2 py-1.5 text-muted">No values</div>
+				<div class="px-2 py-1.5 text-muted">{t().common.noValues}</div>
 			{/each}
 		</div>
 	</div>

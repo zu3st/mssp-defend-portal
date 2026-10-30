@@ -1,13 +1,14 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import { ShieldCheck } from '@lucide/svelte';
+	import { t } from '#lib/i18n/index.svelte.ts';
 	import type { PageProps } from './$types';
 
 	let { form, data }: PageProps = $props();
 	let busy = $state(false);
 </script>
 
-<svelte:head><title>Sign in · {data.tenantName}</title></svelte:head>
+<svelte:head><title>{t().auth.signIn} · {data.tenantName}</title></svelte:head>
 
 <div class="flex min-h-dvh items-center justify-center p-4">
 	<form
@@ -24,7 +25,7 @@
 		<div class="flex items-center gap-2.5">
 			<ShieldCheck size={22} class="text-accent" />
 			<div>
-				<div class="font-semibold">Security Portal</div>
+				<div class="font-semibold">{t().app.name}</div>
 				<div class="text-[12px] text-muted">{data.tenantName}</div>
 			</div>
 		</div>
@@ -37,7 +38,7 @@
 			</div>
 		{/if}
 		<label class="block space-y-1">
-			<span class="text-[13px] text-muted">Username</span>
+			<span class="text-[13px] text-muted">{t().auth.username}</span>
 			<input
 				class="input w-full"
 				name="username"
@@ -47,7 +48,7 @@
 			/>
 		</label>
 		<label class="block space-y-1">
-			<span class="text-[13px] text-muted">Password</span>
+			<span class="text-[13px] text-muted">{t().auth.password}</span>
 			<input
 				class="input w-full"
 				type="password"
@@ -57,7 +58,7 @@
 			/>
 		</label>
 		<button class="btn btn-primary w-full justify-center" disabled={busy}
-			>{busy ? 'Signing in…' : 'Sign in'}</button
+			>{busy ? t().auth.signingIn : t().auth.signIn}</button
 		>
 	</form>
 </div>

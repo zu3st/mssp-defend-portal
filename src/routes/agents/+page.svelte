@@ -11,6 +11,7 @@
 	import RelTime from '#lib/components/RelTime.svelte';
 	import { startAutoRefresh } from '#lib/refresh.ts';
 	import { ArrowUpCircle, Lock } from '@lucide/svelte';
+	import { num, t } from '#lib/i18n/index.svelte.ts';
 	import type { PageProps } from './$types';
 
 	/**
@@ -43,27 +44,27 @@
 	<div class="border-b border-line p-3">
 		<FilterForm
 			search={q.search}
-			placeholder="Search by host name or agent ID"
+			placeholder={t().agents.search}
 			clearHref="/agents"
 			active={filtersActive}
 		>
 			<MultiFilter
 				name="status"
-				label="Status"
+				label={t().agents.status}
 				selected={q.statusGroups ?? []}
 				options={GROUPS.map((g) => ({ value: g, label: fleetGroupLabel[g].label }))}
 			/>
 			<MultiFilter
 				name="tag"
 				freeText
-				label="Tags"
+				label={t().agents.tags}
 				selected={q.tags ?? []}
 				options={data.facets.tags.map((t) => ({ value: t, label: t }))}
 			/>
 			<MultiFilter
 				name="policy"
 				freeText
-				label="Agent policy"
+				label={t().agents.agentPolicy}
 				selected={q.policyIds ?? []}
 				options={data.facets.policies.map((p) => ({ value: p.id, label: p.name }))}
 			/>
@@ -75,12 +76,12 @@
 					checked={q.upgradeAvailable}
 					class="accent-[var(--accent)]"
 				/>
-				Upgrade available
+				{t().agents.upgradeAvailable}
 			</label>
 			<MultiFilter
 				name="version"
 				freeText
-				label="Version"
+				label={t().agents.version}
 				selected={q.versions ?? []}
 				options={data.facets.versions.map((v) => ({ value: v, label: v }))}
 			/>
@@ -94,11 +95,9 @@
 			     legend never shifts when filters change the counts. -->
 			<span class="grid text-muted tabular-nums">
 				<span class="invisible col-start-1 row-start-1" aria-hidden="true"
-					>Showing {(99999).toLocaleString()} agents</span
+					>{t().agents.showing(num(99999))}</span
 				>
-				<span class="col-start-1 row-start-1"
-					>Showing {data.agents.total.toLocaleString()} agents</span
-				>
+				<span class="col-start-1 row-start-1">{t().agents.showing(num(data.agents.total))}</span>
 			</span>
 			{#each GROUPS as g (g)}
 				<span class="inline-flex items-center gap-1.5">
@@ -106,7 +105,7 @@
 					></span>
 					{fleetGroupLabel[g].label}
 					<span class="min-w-[5ch] rounded bg-surface-2 px-1 text-center text-[12px] tabular-nums"
-						>{summary[g].toLocaleString()}</span
+						>{num(summary[g])}</span
 					>
 				</span>
 			{/each}
@@ -141,15 +140,22 @@
 			</colgroup>
 			<thead>
 				<tr>
-					<th>Status</th>
-					<th><SortHeader field="hostname" label="Host" sort={q.sort} dir={q.dir} /></th>
-					<th><SortHeader field="policy" label="Agent policy" sort={q.sort} dir={q.dir} /></th>
-					<th class="text-right">CPU</th>
-					<th class="text-right">Memory</th>
+					<th>{t().agents.status}</th>
+					<th><SortHeader field="hostname" label={t().agents.host} sort={q.sort} dir={q.dir} /></th>
+					<th
+						><SortHeader
+							field="policy"
+							label={t().agents.agentPolicy}
+							sort={q.sort}
+							dir={q.dir}
+						/></th
+					>
+					<th class="text-right">{t().agents.cpu}</th>
+					<th class="text-right">{t().agents.memory}</th>
 					<th>
 						<SortHeader
 							field="lastCheckin"
-							label="Last activity"
+							label={t().agents.lastActivity}
 							sort={q.sort}
 							dir={q.dir}
 							defaultDir="desc"
@@ -158,16 +164,14 @@
 					<th>
 						<SortHeader
 							field="agentVersion"
-							label="Version"
+							label={t().agents.version}
 							sort={q.sort}
 							dir={q.dir}
 							defaultDir="desc"
 						/>
 					</th>
-					<th title="Elastic Defend policy response, as in Security → Endpoints">
-						Elastic Defend
-					</th>
-					<th class="text-right">Open detections</th>
+					<th title={t().agents.defendTitle}> Elastic Defend </th>
+					<th class="text-right">{t().agents.openDetections}</th>
 				</tr>
 			</thead>
 			<tbody>
@@ -183,9 +187,10 @@
 							{#if a.defend.isolated}
 								<span
 									class="ml-2 inline-flex items-center gap-1 align-[-2px] text-[12px] text-[var(--warn)]"
-									title="Network isolated by Elastic Defend"
+									title={t().agents.isolatedTitle}
 								>
-									<Lock size={12} /> Isolated
+									<Lock size={12} />
+									{t().agents.isolated}
 								</span>
 							{/if}
 						</td>
@@ -194,7 +199,7 @@
 								{a.policyName ?? a.policyId ?? '—'}
 							</div>
 							{#if a.policyRevision !== undefined}
-								<div class="text-[12px] text-muted">rev. {a.policyRevision}</div>
+								<div class="text-[12px] text-muted">{t().agents.revision(a.policyRevision)}</div>
 							{/if}
 						</td>
 						<td class="text-right whitespace-nowrap tabular-nums">{formatCpu(a.cpuPercent)}</td>
@@ -205,7 +210,10 @@
 						<td class="whitespace-nowrap">
 							<span class="tabular-nums">{a.agentVersion ?? '—'}</span>
 							{#if a.upgradeAvailable}
-								<span class="ml-1 inline-flex align-[-2px] text-accent" title="Upgrade available">
+								<span
+									class="ml-1 inline-flex align-[-2px] text-accent"
+									title={t().agents.upgradeAvailable}
+								>
 									<ArrowUpCircle size={14} />
 								</span>
 							{/if}
@@ -225,9 +233,11 @@
 				{:else}
 					<tr>
 						<td colspan="9" class="py-10 text-center text-muted">
-							No agents match the current filters.
+							{t().agents.noMatch}
 							{#if filtersActive}
-								<a href="/agents" class="ml-1 text-accent hover:underline">Clear filters</a>
+								<a href="/agents" class="ml-1 text-accent hover:underline"
+									>{t().common.clearFilters}</a
+								>
 							{/if}
 						</td>
 					</tr>
@@ -239,6 +249,6 @@
 		page={data.agents.page}
 		pageSize={data.agents.pageSize}
 		total={data.agents.total}
-		noun="agents"
+		noun={t().pagination.agents}
 	/>
 </div>

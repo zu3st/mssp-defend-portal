@@ -3,6 +3,7 @@
 	import { SEVERITIES, type Severity } from '#lib/contract.ts';
 	import { severityLabel, toneColor } from '#lib/ui.ts';
 	import StatusBadge from './StatusBadges.svelte';
+	import { num, t } from '#lib/i18n/index.svelte.ts';
 
 	/**
 	 * Kibana-style "Severity levels": a Levels | Count table and a thin donut that
@@ -65,8 +66,8 @@
 	<table class="min-w-0 flex-1 text-[13px]">
 		<thead>
 			<tr class="text-[12px] text-muted">
-				<th class="pb-1.5 text-left font-medium">Levels</th>
-				<th class="pb-1.5 text-right font-medium">Count</th>
+				<th class="pb-1.5 text-left font-medium">{t().overview.levels}</th>
+				<th class="pb-1.5 text-right font-medium">{t().overview.count}</th>
 			</tr>
 		</thead>
 		<tbody>
@@ -90,7 +91,7 @@
 							<StatusBadge kind="severity" value={s} />
 						</a>
 					</td>
-					<td class="py-1.5 pr-1 text-right tabular-nums">{counts[s].toLocaleString()}</td>
+					<td class="py-1.5 pr-1 text-right tabular-nums">{num(counts[s])}</td>
 				</tr>
 			{/each}
 		</tbody>
@@ -103,7 +104,7 @@
 			class="h-full w-full"
 			class:cursor-pointer={active !== null}
 			role="img"
-			aria-label="Detections by severity"
+			aria-label={t().overview.bySeverity}
 			onpointermove={(e) => (active = sliceAt(e))}
 			onpointerleave={() => (active = null)}
 			onclick={() => active && goto(hrefFor(active))}
@@ -139,14 +140,14 @@
 		>
 			{#if active}
 				<div class="text-xl leading-6 font-semibold tabular-nums">
-					{counts[active].toLocaleString()}
+					{num(counts[active])}
 				</div>
 				<div class="text-[12px] text-muted">
 					{severityLabel(active).label} · {pct(counts[active])}%
 				</div>
 			{:else}
-				<div class="text-xl leading-6 font-semibold tabular-nums">{total.toLocaleString()}</div>
-				<div class="text-[12px] text-muted">detections</div>
+				<div class="text-xl leading-6 font-semibold tabular-nums">{num(total)}</div>
+				<div class="text-[12px] text-muted">{t().overview.detections}</div>
 			{/if}
 		</div>
 	</div>

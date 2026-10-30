@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { AlertDetail } from '#lib/contract.ts';
-	import { closingReasonLabel, formatDate, toneColor } from '#lib/ui.ts';
+	import { closingReasonLabel, formatDate, severityLabel, toneColor } from '#lib/ui.ts';
+	import { t } from '#lib/i18n/index.svelte.ts';
 	import StatusBadge from '../StatusBadges.svelte';
 	import CopyButton from '../CopyButton.svelte';
 	import { ChevronDown, LoaderCircle, X } from '@lucide/svelte';
@@ -34,8 +35,8 @@
 			headers: { accept: 'application/json' }
 		})
 			.then(async (r) => {
-				if (r.status === 404) throw new Error('This detection was not found.');
-				if (!r.ok) throw new Error('Could not load detection details. Please try again.');
+				if (r.status === 404) throw new Error(t().alert.notFound);
+				if (!r.ok) throw new Error(t().alert.loadFailed);
 				detail = (await r.json()) as AlertDetail;
 			})
 			.catch((e: Error) => {
@@ -61,7 +62,7 @@
 <dialog
 	bind:this={dialog}
 	class="sheet"
-	aria-label="Alert details"
+	aria-label={t().alert.details}
 	{onclose}
 	onclick={(e) => {
 		if (e.target === dialog) dialog?.close();
@@ -72,7 +73,7 @@
 			<button
 				class="btn h-8 w-8 justify-center border-transparent p-0"
 				onclick={() => dialog?.close()}
-				aria-label="Close"
+				aria-label={t().common.close}
 			>
 				<X size={16} />
 			</button>
@@ -81,7 +82,8 @@
 		<div class="flex-1 overflow-y-auto px-6 pb-6">
 			{#if loading && !detail}
 				<div class="flex items-center gap-2 text-muted">
-					<LoaderCircle size={16} class="animate-spin" /> Loading…
+					<LoaderCircle size={16} class="animate-spin" />
+					{t().common.loading}
 				</div>
 			{:else if error}
 				<div class="card p-3 text-[13px] text-[var(--bad)]">{error}</div>
@@ -90,7 +92,7 @@
 				<!-- Header -->
 				<div class="flex items-center gap-1.5 text-[13px]">
 					<span class="h-2 w-2 rounded-full" style:background={toneColor[d.severity]}></span>
-					<span class="capitalize">{d.severity}</span>
+					<span>{severityLabel(d.severity).label}</span>
 				</div>
 				<div class="mt-2 text-[13px] text-muted">{formatDate(d.timestamp, true)}</div>
 				<h2 class="mt-0.5 text-[20px] leading-snug font-semibold">{d.ruleName}</h2>
@@ -100,14 +102,14 @@
 				{#if d.defendRule || sourceRule !== d.ruleName}
 					<dl class="mt-3 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-[13px]">
 						{#if d.defendRule}
-							<dt class="text-muted">Elastic Defend rule</dt>
+							<dt class="text-muted">{t().alert.defendRule}</dt>
 							<dd class="font-medium">{d.defendRule.name}</dd>
 						{/if}
-						<dt class="text-muted">Detection rule</dt>
+						<dt class="text-muted">{t().alert.detectionRule}</dt>
 						<dd>
 							{sourceRule}
 							{#if !d.detectionRule.name && d.detectionRule.uuid}
-								<span class="text-muted">(name unavailable)</span>
+								<span class="text-muted">{t().alert.nameUnavailable}</span>
 							{/if}
 						</dd>
 					</dl>
@@ -121,29 +123,27 @@
 					]}
 				>
 					<div class="card p-3">
-						<div class="text-[13px] font-semibold">Status</div>
+						<div class="text-[13px] font-semibold">{t().alert.status}</div>
 						<div class="mt-1.5"><StatusBadge kind="workflow" value={d.status} /></div>
 						{#if d.status === 'closed' && d.closingReason}
 							<div class="mt-1 text-[12px] text-muted">
-								{closingReasonLabel[d.closingReason] ?? d.closingReason}
+								{closingReasonLabel(d.closingReason)}
 							</div>
 						{/if}
 					</div>
 					<div class="card p-3">
-						<div class="text-[13px] font-semibold">Risk score</div>
+						<div class="text-[13px] font-semibold">{t().alert.riskScore}</div>
 						<div class="mt-1.5 text-[14px] tabular-nums">{d.riskScore ?? '—'}</div>
 					</div>
 					<div class="card p-3">
-						<div class="text-[13px] font-semibold">Assignees</div>
+						<div class="text-[13px] font-semibold">{t().alert.assignees}</div>
 						<div class="mt-1.5 text-[13px]" class:text-muted={d.assignees === 0}>
-							{d.assignees === 0
-								? 'Unassigned'
-								: `${d.assignees} SOC analyst${d.assignees > 1 ? 's' : ''}`}
+							{d.assignees === 0 ? t().alert.unassigned : t().alert.analysts(d.assignees)}
 						</div>
 					</div>
 					{#if d.kind !== 'rule'}
 						<div class="card p-3">
-							<div class="text-[13px] font-semibold">Outcome</div>
+							<div class="text-[13px] font-semibold">{t().alert.outcome}</div>
 							<div class="mt-1.5"><StatusBadge kind="outcome" value={d.outcome} /></div>
 						</div>
 					{/if}
@@ -151,23 +151,23 @@
 
 				<!-- About -->
 				<details open class="group mt-5 border-b border-line pb-4">
-					{@render section('About')}
+					{@render section(t().alert.about)}
 					<div class="mt-2 space-y-4 text-[14px]">
 						{#if d.defendRule?.description}
 							<div>
-								<div class="font-semibold">Elastic Defend rule description</div>
+								<div class="font-semibold">{t().alert.defendRuleDescription}</div>
 								<p class="mt-1 leading-relaxed">{d.defendRule.description}</p>
 							</div>
 						{/if}
 						{#if d.detectionRule.description && !d.defendRule?.description}
 							<div>
-								<div class="font-semibold">Rule description</div>
+								<div class="font-semibold">{t().alert.ruleDescription}</div>
 								<p class="mt-1 leading-relaxed">{d.detectionRule.description}</p>
 							</div>
 						{/if}
 						{#if d.reason}
 							<div>
-								<div class="font-semibold">Alert reason</div>
+								<div class="font-semibold">{t().alert.reason}</div>
 								<p class="mt-1 leading-relaxed">{d.reason}</p>
 							</div>
 						{/if}
@@ -189,15 +189,15 @@
 
 				<!-- Investigation -->
 				<details open class="group mt-4">
-					{@render section('Investigation')}
+					{@render section(t().alert.investigation)}
 					<div class="mt-2">
-						<div class="mb-2 text-[14px] font-semibold">Highlighted fields</div>
+						<div class="mb-2 text-[14px] font-semibold">{t().alert.highlightedFields}</div>
 						<div class="card overflow-hidden">
 							<table class="w-full text-[13px]">
 								<thead>
 									<tr class="border-b border-line bg-surface-2 text-left">
-										<th class="w-[38%] px-3 py-2 font-semibold">Field</th>
-										<th class="px-3 py-2 font-semibold">Value</th>
+										<th class="w-[38%] px-3 py-2 font-semibold">{t().alert.field}</th>
+										<th class="px-3 py-2 font-semibold">{t().alert.value}</th>
 									</tr>
 								</thead>
 								<tbody>
@@ -214,7 +214,7 @@
 														{:else if isHash(h.field)}
 															<span class="mono min-w-0 overflow-x-auto whitespace-nowrap">{v}</span
 															>
-															<CopyButton value={v} label={`Copy ${h.field}`} />
+															<CopyButton value={v} label={t().common.copyThing(h.field)} />
 														{:else}
 															<span class="break-words">{v}</span>
 														{/if}

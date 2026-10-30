@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
 	import { page } from '$app/state';
+	import { t } from '#lib/i18n/index.svelte.ts';
 	import { Search, X } from '@lucide/svelte';
 
 	/**
@@ -11,7 +12,7 @@
 	 */
 	let {
 		search,
-		placeholder = 'Search…',
+		placeholder = t().common.searchPlaceholder,
 		keep = {},
 		clearHref,
 		active = false,
@@ -66,7 +67,7 @@
 			class={['input w-full pl-8', active && 'pr-20']}
 			type="search"
 			name="q"
-			aria-label="Search"
+			aria-label={t().common.search}
 			value={search ?? ''}
 			{placeholder}
 			maxlength="64"
@@ -77,7 +78,7 @@
 			<a
 				class="absolute top-1/2 right-1.5 inline-flex -translate-y-1/2 items-center gap-1 rounded px-1.5 py-0.5 text-[12px] text-muted hover:bg-surface-2 hover:text-fg"
 				href={clearHref}
-				data-sveltekit-reset="false"><X size={12} /> Clear</a
+				data-sveltekit-reset="false"><X size={12} /> {t().common.clear}</a
 			>
 		{/if}
 	</div>
@@ -85,5 +86,5 @@
 	{#each Object.entries(carried) as [k, v] (k)}
 		{#if v}<input type="hidden" name={k} value={v} />{/if}
 	{/each}
-	<noscript><button class="btn btn-primary" type="submit">Apply</button></noscript>
+	<noscript><button class="btn btn-primary" type="submit">{t().common.apply}</button></noscript>
 </form>

@@ -9,6 +9,7 @@
 	import Pagination from '#lib/components/Pagination.svelte';
 	import AlertTable from '#lib/components/alert/AlertTable.svelte';
 	import AlertPanel from '#lib/components/alert/AlertPanel.svelte';
+	import { t } from '#lib/i18n/index.svelte.ts';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
@@ -24,32 +25,32 @@
 	<div class="border-b border-line p-3">
 		<FilterForm
 			search={q.search}
-			placeholder="Search host, user, rule, file, process or SHA256"
+			placeholder={t().detections.search}
 			{clearHref}
 			active={filtersActive}
 		>
 			<MultiFilter
 				name="severity"
-				label="Severity"
+				label={t().detections.severity}
 				selected={q.severities ?? []}
 				options={SEVERITIES.map((s) => ({ value: s, label: severityLabel(s).label }))}
 			/>
 			<MultiFilter
 				name="status"
-				label="Status"
+				label={t().detections.status}
 				selected={q.statuses ?? []}
 				options={WORKFLOW_STATUSES.map((s) => ({ value: s, label: workflowLabel[s].label }))}
 			/>
 			<MultiFilter
 				name="kind"
-				label="Type"
+				label={t().detections.type}
 				selected={q.kinds ?? []}
-				options={ALERT_KINDS.map((k) => ({ value: k, label: kindLabel[k] }))}
+				options={ALERT_KINDS.map((k) => ({ value: k, label: kindLabel(k) }))}
 			/>
 			<MultiFilter
 				name="rule"
 				freeText
-				label="Rule"
+				label={t().detections.rule}
 				selected={q.ruleIds ?? []}
 				options={data.facets.rules.map((r) => ({ value: r.id, label: r.name }))}
 			/>
@@ -69,7 +70,7 @@
 		pageSize={data.alerts.pageSize}
 		total={data.alerts.total}
 		lowerBound={data.alerts.totalIsLowerBound}
-		noun="detections"
+		noun={t().pagination.detections}
 	/>
 </div>
 

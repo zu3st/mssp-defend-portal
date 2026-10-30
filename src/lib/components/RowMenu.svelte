@@ -8,10 +8,12 @@
 
 <script lang="ts">
 	import { closeOnOutsideClick } from '#lib/actions.ts';
+	import { t } from '#lib/i18n/index.svelte.ts';
 	import { Ellipsis } from '@lucide/svelte';
 
 	/** "⋯" menu at the end of a table row. Clicks never reach the row itself. */
-	let { actions, label = 'Row actions' }: { actions: RowAction[]; label?: string } = $props();
+	let { actions, label = t().common.rowActions }: { actions: RowAction[]; label?: string } =
+		$props();
 
 	let el: HTMLDetailsElement | undefined = $state();
 	let menu: HTMLDivElement | undefined = $state();

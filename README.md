@@ -12,6 +12,9 @@ is one Kibana space and its data stream namespaces, and has three pages:
 - **Agents:** a Fleet-style agent list and agent page with Elastic Defend policy status,
   network isolation, integration health and the agent's detections.
 
+The portal is in English and German, using Kibana's German terms where Kibana has them. It
+follows the browser's language until the user picks one in the top bar.
+
 | Overview                                 | Detection details                            |
 | ---------------------------------------- | -------------------------------------------- |
 | ![](docs/screenshots/light-overview.png) | ![](docs/screenshots/dark-detail-memory.png) |

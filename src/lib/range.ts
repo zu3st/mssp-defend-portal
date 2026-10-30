@@ -1,7 +1,11 @@
+import { INTL_TAG, locale, t } from '#lib/i18n/index.svelte.ts';
+
 /**
  * Time ranges as Kibana's date picker offers them: relative ("Last 7 days"),
  * rounded ("Today", "This week") or absolute (a from/to date pair). Shared by
  * the picker (labels, URLs, cookie) and the server (bounds, see params.ts).
+ *
+ * Labels follow the current UI language.
  *
  * URL form:    ?range=7d | ?range=today | ?range=custom&from=2026-10-01&to=2026-10-20
  * Cookie form: "7d" | "today" | "2026-10-01..2026-10-20"
@@ -19,15 +23,8 @@ export const DEFAULT_RANGE: RangeSpec = { key: '7d' };
 /** Kibana's default "Commonly used" list. */
 export const COMMONLY_USED = ['today', 'week', '15m', '30m', '1h', '24h', '7d', '30d', '90d', '1y'];
 
-export const UNITS = {
-	m: 'minute',
-	h: 'hour',
-	d: 'day',
-	w: 'week',
-	mo: 'month',
-	y: 'year'
-} as const;
-export type Unit = keyof typeof UNITS;
+export const UNITS = ['m', 'h', 'd', 'w', 'mo', 'y'] as const;
+export type Unit = (typeof UNITS)[number];
 
 const UNIT_DAYS: Record<Unit, number> = { m: 1 / 1440, h: 1 / 24, d: 1, w: 7, mo: 31, y: 366 };
 /** Longest range the portal queries; every relative and custom range is checked against it. */
@@ -82,17 +79,19 @@ export function specFromCookie(v: string | undefined): RangeSpec | null {
 }
 
 /** Calendar dates are shown as written, never shifted by a time zone. */
-const dayFmt = new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeZone: 'UTC' });
-const day = (d: string) => dayFmt.format(new Date(`${d}T00:00:00Z`));
+const day = (d: string) =>
+	new Intl.DateTimeFormat(INTL_TAG[locale()], { dateStyle: 'medium', timeZone: 'UTC' }).format(
+		new Date(`${d}T00:00:00Z`)
+	);
 
 export function rangeLabel(spec: RangeSpec): string {
-	if (spec.key === 'today') return 'Today';
-	if (spec.key === 'week') return 'This week';
+	if (spec.key === 'today') return t().range.today;
+	if (spec.key === 'week') return t().range.thisWeek;
 	if (spec.key === 'custom' && spec.from && spec.to) {
 		return spec.from === spec.to ? day(spec.from) : `${day(spec.from)} → ${day(spec.to)}`;
 	}
 	const r = parseRelative(spec.key);
-	return r ? `Last ${r.n} ${UNITS[r.unit]}${r.n === 1 ? '' : 's'}` : spec.key;
+	return r ? t().range.lastN(r.n, r.unit) : spec.key;
 }
 
 export const sameRange = (a: RangeSpec, b: RangeSpec) =>

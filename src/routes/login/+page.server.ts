@@ -1,6 +1,7 @@
 import { fail, redirect } from '@sveltejs/kit';
 import { app } from '#lib/server/app.ts';
 import { encodeSession, SESSION_COOKIE, verifyPassword } from '#lib/server/auth.ts';
+import { messages } from '#lib/i18n/index.svelte.ts';
 import type { Actions, PageServerLoad } from './$types';
 
 /** Only same-site relative paths are accepted as post-login targets. */
@@ -14,8 +15,9 @@ export const load: PageServerLoad = ({ locals, url }) => {
 };
 
 export const actions: Actions = {
-	default: async ({ request, cookies, url, getClientAddress }) => {
+	default: async ({ request, cookies, url, getClientAddress, locals }) => {
 		const { config, limiter } = app();
+		const text = messages(locals.locale).auth;
 		const form = await request.formData();
 		const username = String(form.get('username') ?? '')
 			.trim()
@@ -26,7 +28,7 @@ export const actions: Actions = {
 		if (!limiter.allow(ip) || !limiter.acquire()) {
 			return fail(429, {
 				username,
-				message: 'Too many login attempts. Please wait a minute and try again.'
+				message: text.tooMany
 			});
 		}
 		let ok: boolean;
@@ -41,7 +43,7 @@ export const actions: Actions = {
 		if (!ok) {
 			limiter.fail(ip);
 			console.warn(JSON.stringify({ level: 'warn', msg: 'login failed', user: username }));
-			return fail(400, { username, message: 'Invalid username or password.' });
+			return fail(400, { username, message: text.invalid });
 		}
 
 		const exp = Math.floor(Date.now() / 1000) + config.auth.sessionTtlSeconds;

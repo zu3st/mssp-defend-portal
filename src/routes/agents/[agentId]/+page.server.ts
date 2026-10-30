@@ -1,13 +1,14 @@
 import { error } from '@sveltejs/kit';
 import { app } from '#lib/server/app.ts';
 import { parseAlertQuery, requestRange } from '#lib/server/params.ts';
+import { messages } from '#lib/i18n/index.svelte.ts';
 import type { PageServerLoad } from './$types';
 
-export const load: PageServerLoad = async ({ params, url, cookies }) => {
+export const load: PageServerLoad = async ({ params, url, cookies, locals }) => {
 	const { portal } = app();
 	const agent = await portal.agent(params.agentId);
 	// Other tenants' agents are indistinguishable from missing ones.
-	if (!agent) error(404, 'Agent not found');
+	if (!agent) error(404, messages(locals.locale).errors.agentNotFound);
 
 	const tab = url.searchParams.get('tab') === 'detections' ? 'detections' : 'details';
 	if (tab === 'details') return { agent, tab, alerts: null, query: null, facets: null };

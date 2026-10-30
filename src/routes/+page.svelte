@@ -10,6 +10,7 @@
 	import SeverityLevels from '#lib/components/SeverityLevels.svelte';
 	import RelTime from '#lib/components/RelTime.svelte';
 	import { ChevronRight, ShieldAlert, ShieldCheck, Server, ShieldBan } from '@lucide/svelte';
+	import { t } from '#lib/i18n/index.svelte.ts';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
@@ -26,13 +27,13 @@
 		// Elastic Defend's own unit message beats Fleet's generic "1 or more components…".
 		const c = a.defend.componentStatus;
 		if ((c === 'FAILED' || c === 'DEGRADED') && a.defend.componentMessage) {
-			return `Elastic Defend: ${stripStatusPrefix(a.defend.componentMessage)}`;
+			return t().overview.defendMessage(stripStatusPrefix(a.defend.componentMessage));
 		}
 		if (a.fleetMessage) return a.fleetMessage;
-		if (a.defend.status === 'failure') return 'Elastic Defend policy response: failure';
-		if (a.defend.status === 'warning') return 'Elastic Defend policy response: warning';
-		if (a.fleetStatusGroup === 'offline') return 'Agent is not checking in';
-		if (a.fleetStatusGroup === 'orphaned') return 'Agent has lost contact with Fleet Server';
+		if (a.defend.status === 'failure' || a.defend.status === 'warning')
+			return t().overview.policyResponse(policyLabel[a.defend.status].label);
+		if (a.fleetStatusGroup === 'offline') return t().overview.notCheckingIn;
+		if (a.fleetStatusGroup === 'orphaned') return t().overview.lostFleet;
 		return undefined;
 	}
 	/** Links into Detections keep this page's time range, even one set only by URL. */
@@ -47,7 +48,8 @@
 <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
 	<a href="/agents" class="card block px-4 py-3 hover:border-[var(--accent)]">
 		<div class="flex items-center justify-between text-[13px] text-muted">
-			Agents <Server size={16} />
+			{t().nav.agents}
+			<Server size={16} />
 		</div>
 		<div class="text-2xl leading-8 font-semibold tabular-nums">{o.agents.total}</div>
 		<div class="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[12px]">
@@ -56,7 +58,7 @@
 					<span class="dot" style:background={toneColor[fleetGroupLabel[g].tone]}></span>{o.agents[
 						g
 					]}
-					{fleetGroupLabel[g].label.toLowerCase()}
+					{t().fleetCount[g]}
 				</span>
 			{/each}
 		</div>
@@ -64,11 +66,14 @@
 
 	<a href="/agents" class="card block px-4 py-3 hover:border-[var(--accent)]">
 		<div class="flex items-center justify-between text-[13px] text-muted">
-			Elastic Defend policy status <ShieldCheck size={16} />
+			{t().overview.policyStatus}
+			<ShieldCheck size={16} />
 		</div>
 		<div class="text-2xl leading-8 font-semibold tabular-nums">
 			{o.policy.success}<span class="text-[14px] font-normal text-muted"
-				>&nbsp;/ {withDefend} success{o.policyCountsCapped ? ' (first 5,000 agents)' : ''}</span
+				>&nbsp;{t().overview.ofSuccess(withDefend)}{o.policyCountsCapped
+					? t().overview.first5000
+					: ''}</span
 			>
 		</div>
 		<div class="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[12px]">
@@ -76,7 +81,7 @@
 				{#if o.policy[s] > 0 || s === 'failure'}
 					<span class:text-muted={o.policy[s] === 0}>
 						<span class="dot" style:background={toneColor[policyLabel[s].tone]}></span>{o.policy[s]}
-						{policyLabel[s].label.toLowerCase()}
+						{t().policyCount[s]}
 					</span>
 				{/if}
 			{/each}
@@ -88,35 +93,39 @@
 		class="card block px-4 py-3 hover:border-[var(--accent)]"
 	>
 		<div class="flex items-center justify-between text-[13px] text-muted">
-			Active detections <ShieldAlert size={16} />
+			{t().overview.activeDetections}
+			<ShieldAlert size={16} />
 		</div>
 		<div class="text-2xl leading-8 font-semibold tabular-nums">{active}</div>
 		<div class="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[12px]">
 			<span class:text-muted={o.alerts.activeBySeverity.critical === 0}
-				><span class="dot" style:background={toneColor['critical']}></span>{o.alerts
-					.activeBySeverity.critical} critical</span
+				><span class="dot" style:background={toneColor['critical']}></span>{t().overview.critical(
+					o.alerts.activeBySeverity.critical
+				)}</span
 			>
 			<span class:text-muted={o.alerts.activeBySeverity.high === 0}
-				><span class="dot" style:background={toneColor['high']}></span>{o.alerts.activeBySeverity
-					.high} high</span
+				><span class="dot" style:background={toneColor['high']}></span>{t().overview.high(
+					o.alerts.activeBySeverity.high
+				)}</span
 			>
 			<span class="text-muted"
-				>{o.alerts.byStatus.open} open · {o.alerts.byStatus.acknowledged} ack.</span
+				>{t().overview.openAck(o.alerts.byStatus.open, o.alerts.byStatus.acknowledged)}</span
 			>
 		</div>
 	</a>
 
 	<div class="card px-4 py-3">
 		<div class="flex items-center justify-between text-[13px] text-muted">
-			Threats prevented <ShieldBan size={16} />
+			{t().overview.threatsPrevented}
+			<ShieldBan size={16} />
 		</div>
 		<div class="text-2xl leading-8 font-semibold tabular-nums">
 			{o.alerts.prevented}<span class="text-[14px] font-normal text-muted"
-				>&nbsp;of {o.alerts.total} detections</span
+				>&nbsp;{t().overview.ofDetections(o.alerts.total)}</span
 			>
 		</div>
 		<div class="mt-1 text-[12px] text-muted">
-			Blocked or quarantined by Elastic Defend · {range}
+			{t().overview.blocked(range)}
 		</div>
 	</div>
 </div>
@@ -124,19 +133,19 @@
 <div class="mt-3 grid gap-3 lg:grid-cols-5">
 	<!-- Needs attention -->
 	<section class="card min-w-0 lg:col-span-3">
-		<header class="flex items-center justify-between border-b border-line px-4 py-3">
+		<header class="flex items-center justify-between gap-3 border-b border-line px-4 py-3">
 			<h2 class="font-semibold">
-				Agents needing attention
+				{t().overview.needingAttention}
 				{#if o.attentionTotal > 0}<span class="ml-1 font-normal text-muted tabular-nums"
 						>{o.attentionTotal}</span
 					>{/if}
 			</h2>
 			<a
 				href="/agents?status=unhealthy&status=orphaned&status=offline"
-				class="text-[12px] text-accent hover:underline"
+				class="shrink-0 text-[12px] whitespace-nowrap text-accent hover:underline"
 				>{o.attentionTotal > o.attention.length
-					? `Top ${o.attention.length} shown · view agents`
-					: 'View agents'}</a
+					? t().overview.topShown(o.attention.length)
+					: t().overview.viewAgents}</a
 			>
 		</header>
 		{#if o.attention.length}
@@ -146,11 +155,13 @@
 					<colgroup>
 						<col />
 						<col class="w-30" />
-						<col class="w-30" />
+						<col class="w-34" />
 						<col class="w-32" />
 					</colgroup>
 					<thead
-						><tr><th>Host</th><th>Agent status</th><th>Elastic Defend</th><th>Last activity</th></tr
+						><tr
+							><th>{t().overview.host}</th><th>{t().overview.agentStatus}</th><th>Elastic Defend</th
+							><th>{t().overview.lastActivity}</th></tr
 						></thead
 					>
 					<tbody>
@@ -178,8 +189,8 @@
 			</div>
 		{:else}
 			<div class="flex items-center gap-2 px-4 py-8 text-muted">
-				<ShieldCheck size={16} class="text-[var(--ok)]" /> All agents are healthy and every Elastic Defend
-				policy applied successfully.
+				<ShieldCheck size={16} class="shrink-0 text-[var(--ok)]" />
+				{t().overview.allHealthy}
 			</div>
 		{/if}
 	</section>
@@ -188,8 +199,10 @@
 	<section class="card min-w-0 lg:col-span-2">
 		<header class="border-b border-line px-4 py-3">
 			<h2 class="font-semibold">
-				Severity levels
-				<span class="ml-1 text-[12px] font-normal text-muted">All statuses · {range}</span>
+				{t().overview.severityLevels}
+				<span class="ml-1 text-[12px] font-normal text-muted"
+					>{t().overview.allStatuses(range)}</span
+				>
 			</h2>
 		</header>
 		<div class="px-4 py-4">
@@ -203,12 +216,13 @@
 
 <section class="card mt-3 min-w-0">
 	<header class="flex items-center justify-between border-b border-line px-4 py-3">
-		<h2 class="font-semibold">Recent high-priority detections</h2>
+		<h2 class="font-semibold">{t().overview.recentHigh}</h2>
 		<a
 			href={detectionsHref({ severity: 'critical,high', status: 'open,acknowledged' })}
 			class="inline-flex items-center text-[12px] text-accent hover:underline"
 		>
-			All detections <ChevronRight size={14} />
+			{t().overview.allDetections}
+			<ChevronRight size={14} />
 		</a>
 	</header>
 	<AlertTable
@@ -216,7 +230,7 @@
 		{selected}
 		onselect={(id) => selectAlert(id)}
 		sortable={false}
-		emptyText="No open critical or high detections in this time range."
+		emptyText={t().overview.noHigh}
 	/>
 </section>
 

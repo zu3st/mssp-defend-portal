@@ -2,6 +2,7 @@
 	import { goto } from '$app/navigation';
 	import { page as pageState } from '$app/state';
 	import { withParams } from '#lib/ui.ts';
+	import { num, t } from '#lib/i18n/index.svelte.ts';
 	import { ChevronLeft, ChevronRight } from '@lucide/svelte';
 
 	let {
@@ -9,13 +10,14 @@
 		pageSize,
 		total,
 		lowerBound = false,
-		noun = 'items'
+		noun
 	}: {
 		page: number;
 		pageSize: number;
 		total: number;
 		lowerBound?: boolean;
-		noun?: string;
+		/** Plural of what is counted, e.g. "detections". */
+		noun: string;
 	} = $props();
 
 	const pages = $derived(Math.max(1, Math.ceil(total / pageSize)));
@@ -29,18 +31,15 @@
 >
 	<div>
 		{#if total === 0}
-			0 {noun}
+			{t().pagination.none(noun)}
 		{:else}
-			{first.toLocaleString()}–{last.toLocaleString()} of {total.toLocaleString()}{lowerBound
-				? '+'
-				: ''}
-			{noun}
+			{t().pagination.shown(num(first), num(last), num(total) + (lowerBound ? '+' : ''), noun)}
 		{/if}
 	</div>
 	<!-- Hidden (not removed) when empty, so the bar keeps its height. -->
 	<div class="flex items-center gap-2" class:invisible={total === 0}>
 		<label class="flex items-center gap-1.5">
-			Rows
+			{t().pagination.rows}
 			<select
 				class="input h-7 px-1.5"
 				value={String(pageSize)}
@@ -51,12 +50,12 @@
 				{#each [10, 25, 50, 100] as s (s)}<option value={String(s)}>{s}</option>{/each}
 			</select>
 		</label>
-		<span>Page {page} / {pages}</span>
+		<span>{t().pagination.page(page, pages)}</span>
 		{#if page > 1}
 			<a
 				class="btn h-7 px-2"
 				href={link(page - 1)}
-				aria-label="Previous page"
+				aria-label={t().pagination.previous}
 				data-sveltekit-reset="false"><ChevronLeft size={14} /></a
 			>
 		{:else}
@@ -66,7 +65,7 @@
 			<a
 				class="btn h-7 px-2"
 				href={link(page + 1)}
-				aria-label="Next page"
+				aria-label={t().pagination.next}
 				data-sveltekit-reset="false"><ChevronRight size={14} /></a
 			>
 		{:else}

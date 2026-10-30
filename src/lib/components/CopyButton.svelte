@@ -1,8 +1,9 @@
 <script lang="ts">
+	import { t } from '#lib/i18n/index.svelte.ts';
 	import { Check, Copy } from '@lucide/svelte';
 
 	/** Small icon button that copies `value` and briefly confirms with a check mark. */
-	let { value, label = 'Copy' }: { value: string; label?: string } = $props();
+	let { value, label = t().common.copy }: { value: string; label?: string } = $props();
 
 	let copied = $state(false);
 	let timer: ReturnType<typeof setTimeout> | undefined;

@@ -4,6 +4,8 @@
 	import { invalidateAll } from '$app/navigation';
 	import type { LayoutProps } from './$types';
 	import TimePicker from '#lib/components/TimePicker.svelte';
+	import LanguagePicker from '#lib/components/LanguagePicker.svelte';
+	import { setLocale, t } from '#lib/i18n/index.svelte.ts';
 	import {
 		LayoutDashboard,
 		LogOut,
@@ -18,11 +20,16 @@
 
 	let { children, data }: LayoutProps = $props();
 
-	const nav = [
-		{ href: '/', label: 'Overview', icon: LayoutDashboard },
-		{ href: '/detections', label: 'Detections', icon: ShieldAlert },
-		{ href: '/agents', label: 'Agents', icon: Server }
-	];
+	// Before anything below renders, on the server and when the page hydrates;
+	// the language picker switches it afterwards.
+	// svelte-ignore state_referenced_locally
+	setLocale(data.locale);
+
+	const nav = $derived([
+		{ href: '/', label: t().nav.overview, icon: LayoutDashboard },
+		{ href: '/detections', label: t().nav.detections, icon: ShieldAlert },
+		{ href: '/agents', label: t().nav.agents, icon: Server }
+	]);
 
 	const isActive = (href: string) =>
 		href === '/' ? page.url.pathname === '/' : page.url.pathname.startsWith(href);
@@ -60,7 +67,7 @@
 </script>
 
 <svelte:head>
-	<title>{pageTitle ? `${pageTitle} · ` : ''}{data.tenantName} · Security Portal</title>
+	<title>{pageTitle ? `${pageTitle} · ` : ''}{data.tenantName} · {t().app.name}</title>
 	<link rel="icon" href="/favicon.svg" />
 </svelte:head>
 
@@ -75,7 +82,7 @@
 			<div class="flex h-14 items-center gap-2 border-b border-line px-4">
 				<ShieldCheck size={20} class="text-accent" />
 				<div class="leading-tight">
-					<div class="text-[13px] font-semibold">Security Portal</div>
+					<div class="text-[13px] font-semibold">{t().app.name}</div>
 					<div class="max-w-40 truncate text-[11px] text-muted">{data.tenantName}</div>
 				</div>
 			</div>
@@ -98,18 +105,18 @@
 		{#if mobileNav}
 			<button
 				class="fixed inset-0 z-20 bg-black/30 md:hidden"
-				aria-label="Close menu"
+				aria-label={t().nav.closeMenu}
 				onclick={() => (mobileNav = false)}
 			></button>
 		{/if}
 
 		<div class="flex min-w-0 flex-1 flex-col md:pl-56">
 			<header
-				class="sticky top-0 z-10 flex h-14 items-center gap-3 border-b border-line bg-surface/90 px-4 backdrop-blur"
+				class="sticky top-0 z-10 flex h-14 items-center gap-2 border-b border-line bg-surface/90 px-4 backdrop-blur sm:gap-3"
 			>
 				<button
 					class="btn h-8 w-8 justify-center p-0 md:hidden"
-					aria-label="Open menu"
+					aria-label={t().nav.openMenu}
 					onclick={() => (mobileNav = true)}
 				>
 					<Menu size={16} />
@@ -119,7 +126,9 @@
 					{pageTitle}
 				</h1>
 				{#if navigating.to}
-					<span class="h-1.5 w-1.5 animate-pulse rounded-full bg-accent" aria-label="Loading"
+					<span
+						class="h-1.5 w-1.5 animate-pulse rounded-full bg-accent"
+						aria-label={t().nav.loading}
 					></span>
 				{/if}
 				<div class="ml-auto flex items-center gap-1.5 sm:gap-2">
@@ -135,17 +144,20 @@
 					<button
 						class="btn h-8 w-8 justify-center p-0"
 						onclick={cycleTheme}
-						aria-label={`Theme: ${theme}`}
-						title={`Theme: ${theme}`}
+						aria-label={t().theme.label(t().theme[theme])}
+						title={t().theme.label(t().theme[theme])}
 					>
 						{#if theme === 'dark'}<Moon size={15} />{:else if theme === 'light'}<Sun
 								size={15}
 							/>{:else}<SunMoon size={15} />{/if}
 					</button>
+					<LanguagePicker pref={data.localePref} />
 					<span class="hidden text-[13px] text-muted sm:inline">{data.user}</span>
 					<form method="POST" action="/logout">
-						<button class="btn h-8 w-8 justify-center p-0" aria-label="Sign out" title="Sign out"
-							><LogOut size={15} /></button
+						<button
+							class="btn h-8 w-8 justify-center p-0"
+							aria-label={t().auth.signOut}
+							title={t().auth.signOut}><LogOut size={15} /></button
 						>
 					</form>
 				</div>
