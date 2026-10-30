@@ -191,7 +191,7 @@ export const en = {
 		openAck: (open: number, ack: number) => `${open} open · ${ack} ack.`,
 		threatsPrevented: 'Threats prevented',
 		ofDetections: (n: number) => `of ${n} detections`,
-		blocked: (range: string) => `Blocked or quarantined by Elastic Defend · ${range}`,
+		blocked: (range: string) => `Blocked or quarantined · ${range}`,
 		needingAttention: 'Agents needing attention',
 		topShown: (n: number) => `Top ${n} shown · view agents`,
 		viewAgents: 'View agents',

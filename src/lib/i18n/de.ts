@@ -76,7 +76,7 @@ export const de: Messages = {
 		healthy: 'gesund',
 		unhealthy: 'ungesund',
 		offline: 'offline',
-		updating: 'in Aktualisierung'
+		updating: 'aktualisierend'
 	},
 	policy: {
 		success: 'Erfolg',
@@ -86,7 +86,7 @@ export const de: Messages = {
 		not_installed: 'Nicht installiert'
 	},
 	policyCount: {
-		failure: 'mit Fehler',
+		failure: 'Fehler',
 		warning: 'mit Warnung',
 		unknown: 'unbekannt',
 		not_installed: 'nicht installiert'
@@ -195,8 +195,7 @@ export const de: Messages = {
 		openAck: (open: number, ack: number) => `${open} offen · ${ack} best.`,
 		threatsPrevented: 'Verhinderte Bedrohungen',
 		ofDetections: (n: number) => `von ${n} Erkennungen`,
-		blocked: (range: string) =>
-			`Von Elastic Defend blockiert oder in Quarantäne verschoben · ${range}`,
+		blocked: (range: string) => `Blockiert oder in Quarantäne · ${range}`,
 		needingAttention: 'Agenten mit Handlungsbedarf',
 		topShown: (n: number) => `Top ${n} angezeigt · Agenten anzeigen`,
 		viewAgents: 'Agenten anzeigen',
