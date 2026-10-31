@@ -186,7 +186,6 @@ export class ElasticDataSource implements DataSource {
 	}
 
 	async agentStatusSummary(scope: TenantScope, q: AgentQuery) {
-		// NOTE: verify `getStatusSummary` on the lab version (Fleet 8.16+).
 		const res = await this.client.kibanaGet<RawFleetAgentList>(
 			`${this.space(scope)}/api/fleet/agents`,
 			{
@@ -218,7 +217,6 @@ export class ElasticDataSource implements DataSource {
 
 	async endpointMetadata(scope: TenantScope, agentIds: string[]) {
 		if (agentIds.length === 0) return [];
-		// NOTE: verify the `united.*` kuery field names against the lab version.
 		const res = await this.client.kibanaGet<RawEndpointMetadataList>(
 			`${this.space(scope)}/api/endpoint/metadata`,
 			{

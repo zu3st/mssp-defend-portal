@@ -8,7 +8,7 @@ import type { ElasticConfig } from '../config';
  * coupling and adds no dependency. Every request is checked against an
  * allowlist of read-only endpoints before it is sent.
  *
- * TLS: for a lab CA, set NODE_EXTRA_CA_CERTS=/path/to/ca.crt (Node built-in).
+ * TLS: for a private CA, set NODE_EXTRA_CA_CERTS=/path/to/ca.crt (Node built-in).
  */
 
 export class ElasticUnavailableError extends Error {

@@ -1,5 +1,5 @@
 #!/bin/sh
-# Generates lab/.env with random lab credentials (once). Uses Docker, not host tools.
+# Generates lab/.env with random lab credentials (once), in Docker.
 set -eu
 cd "$(dirname "$0")"
 [ -f .env ] && { echo "lab/.env exists, keeping it"; exit 0; }

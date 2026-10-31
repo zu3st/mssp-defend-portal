@@ -1,5 +1,5 @@
 /**
- * SYNTHETIC LAB DATA — not real Elastic data.
+ * Generated data for `DATA_SOURCE=mock`.
  *
  * Builds a deterministic, Elastic-shaped "cluster" containing several MSSP
  * customers: Fleet agents, agent policies, endpoint metadata and
