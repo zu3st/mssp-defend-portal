@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
+	import LoginBackdrop from '#lib/components/LoginBackdrop.svelte';
 	import { ShieldCheck } from '@lucide/svelte';
 	import { t } from '#lib/i18n/index.svelte.ts';
 	import type { PageProps } from './$types';
@@ -10,7 +11,8 @@
 
 <svelte:head><title>{t().auth.signIn} · {data.tenantName}</title></svelte:head>
 
-<div class="flex min-h-dvh items-center justify-center p-4">
+<div class="relative isolate flex min-h-dvh items-center justify-center p-4">
+	<LoginBackdrop />
 	<form
 		method="POST"
 		class="card w-full max-w-sm space-y-4 p-6"

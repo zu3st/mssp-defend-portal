@@ -30,6 +30,10 @@
 	--sev-high: #f06418;
 	--sev-medium: #dcad00;
 	--sev-low: #3567c8;
+
+	/* Login backdrop: the dot grid and the light that passes over it. */
+	--backdrop-dot: rgb(95 107 122 / 0.2);
+	--backdrop-wave: rgb(37 99 235 / 0.4);
 	color-scheme: light;
 }
 
@@ -58,6 +62,9 @@
 	--sev-high: #b5490a;
 	--sev-medium: #a88900;
 	--sev-low: #4a78dc;
+
+	--backdrop-dot: rgb(141 152 168 / 0.16);
+	--backdrop-wave: rgb(122 162 247 / 0.5);
 	color-scheme: dark;
 }
 
@@ -87,6 +94,9 @@
 		--sev-high: #b5490a;
 		--sev-medium: #a88900;
 		--sev-low: #4a78dc;
+
+		--backdrop-dot: rgb(141 152 168 / 0.16);
+		--backdrop-wave: rgb(122 162 247 / 0.5);
 		color-scheme: dark;
 	}
 }
