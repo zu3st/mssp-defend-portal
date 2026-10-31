@@ -8,7 +8,7 @@ import type { Messages } from './en.ts';
 const plural = (n: number, one: string, other: string) => (n === 1 ? one : other);
 
 export const de: Messages = {
-	app: { name: 'Sicherheitsportal' },
+	app: { name: 'Defend Portal' },
 	nav: {
 		overview: 'Überblick',
 		detections: 'Erkennungen',

@@ -8,7 +8,7 @@
 const plural = (n: number, one: string, other: string) => (n === 1 ? one : other);
 
 export const en = {
-	app: { name: 'Security Portal' },
+	app: { name: 'Defend Portal' },
 	nav: {
 		overview: 'Overview',
 		detections: 'Detections',
