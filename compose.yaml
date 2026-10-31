@@ -2,9 +2,11 @@
 #
 # One container per customer. Each container is bound to exactly one tenant
 # by its environment and (in elastic mode) its own tenant-specific API key.
+# Each customer also has its own Kanidm, where its users sign in.
 #
-#   scripts/lab-init.sh            # once: generate session secrets + demo users
-#   docker compose up -d --build   # mock data (default)
+#   docker compose build           # once, before lab-init
+#   scripts/lab-init.sh            # once: secrets, Kanidm setup, demo user sign-up links
+#   docker compose up -d           # mock data (default)
 #
 # To use the real lab stack instead of mock data, see compose.elastic.yaml.
 
@@ -19,15 +21,29 @@ x-portal: &portal
   environment: &portal-env
     DATA_SOURCE: mock
     SESSION_SECRET_FILE: /run/secrets/session_secret
-    PORTAL_USERS_FILE: /run/secrets/users
+    OIDC_CLIENT_SECRET_FILE: /run/secrets/oidc_client_secret
+    # Kanidm's lab certificate (self-signed CA from `kanidmd cert-generate`).
+    NODE_EXTRA_CA_CERTS: /run/secrets/idm_ca
     # Lab runs over plain HTTP; set to true (default) behind TLS.
     COOKIE_SECURE: 'false'
+
+# Kanidm, one per customer. The browser and the portal reach it under the same
+# name: *.localhost resolves to this machine in browsers, and to this container
+# on the Compose network.
+x-idm: &idm
+  image: kanidm/server:1.11.2@sha256:e45f00bd354c1fc1c06a4be484b4e87b094c431e78280f1d19e911815e63efb5
+  restart: unless-stopped
+  environment: &idm-env
+    KANIDM_DB_PATH: /data/kanidm.db
+    KANIDM_TLS_CHAIN: /tls/chain.pem
+    KANIDM_TLS_KEY: /tls/key.pem
 
 services:
   portal-acme:
     <<: *portal
     container_name: portal-acme
     ports: ['127.0.0.1:3101:3000']
+    depends_on: [idm-acme]
     environment:
       <<: *portal-env
       ORIGIN: http://localhost:3101
@@ -36,16 +52,38 @@ services:
       KIBANA_SPACE_ID: acme
       TENANT_AGENT_POLICY_IDS: acme-workstations,acme-servers
       TENANT_NAMESPACES: acme
+      OIDC_ISSUER: https://idm-acme.localhost:8443/oauth2/openid/portal-acme
+      OIDC_CLIENT_ID: portal-acme
+      OIDC_REQUIRED_GROUP: portal_users@idm-acme.localhost
     secrets:
       - source: acme_session_secret
         target: session_secret
-      - source: acme_users
-        target: users
+      - source: acme_oidc_client_secret
+        target: oidc_client_secret
+      - source: acme_idm_ca
+        target: idm_ca
+
+  idm-acme:
+    <<: *idm
+    container_name: idm-acme
+    ports: ['127.0.0.1:8443:8443']
+    environment:
+      <<: *idm-env
+      KANIDM_DOMAIN: idm-acme.localhost
+      KANIDM_ORIGIN: https://idm-acme.localhost:8443
+      KANIDM_BINDADDRESS: 0.0.0.0:8443
+    volumes:
+      - idm-acme:/data
+      - ./secrets/acme/idm-tls:/tls
+    networks:
+      default:
+        aliases: [idm-acme.localhost]
 
   portal-globex:
     <<: *portal
     container_name: portal-globex
     ports: ['127.0.0.1:3102:3000']
+    depends_on: [idm-globex]
     environment:
       <<: *portal-env
       ORIGIN: http://localhost:3102
@@ -54,18 +92,58 @@ services:
       KIBANA_SPACE_ID: globex
       TENANT_AGENT_POLICY_IDS: globex-endpoints
       TENANT_NAMESPACES: globex
+      OIDC_ISSUER: https://idm-globex.localhost:8444/oauth2/openid/portal-globex
+      OIDC_CLIENT_ID: portal-globex
+      OIDC_REQUIRED_GROUP: portal_users@idm-globex.localhost
     secrets:
       - source: globex_session_secret
         target: session_secret
-      - source: globex_users
-        target: users
+      - source: globex_oidc_client_secret
+        target: oidc_client_secret
+      - source: globex_idm_ca
+        target: idm_ca
+
+  idm-globex:
+    <<: *idm
+    container_name: idm-globex
+    ports: ['127.0.0.1:8444:8444']
+    environment:
+      <<: *idm-env
+      KANIDM_DOMAIN: idm-globex.localhost
+      KANIDM_ORIGIN: https://idm-globex.localhost:8444
+      KANIDM_BINDADDRESS: 0.0.0.0:8444
+    volumes:
+      - idm-globex:/data
+      - ./secrets/globex/idm-tls:/tls
+    networks:
+      default:
+        aliases: [idm-globex.localhost]
+
+  # Kanidm's admin CLI, used by scripts/lab-init.sh.
+  idm-cli:
+    image: kanidm/tools:1.11.2@sha256:144783fc589ac9611f6149f54f95d0d9472c1bf6078e7ed5781be441bcca7d24
+    profiles: [tools]
+    entrypoint: [/bin/sh]
+
+# Named, so the development server can join it (see README, Development).
+networks:
+  default:
+    name: mssp-defend-portal
+
+volumes:
+  idm-acme:
+  idm-globex:
 
 secrets:
   acme_session_secret:
     file: ./secrets/acme/session_secret
-  acme_users:
-    file: ./secrets/acme/users.json
+  acme_oidc_client_secret:
+    file: ./secrets/acme/oidc_client_secret
+  acme_idm_ca:
+    file: ./secrets/acme/idm-tls/ca.pem
   globex_session_secret:
     file: ./secrets/globex/session_secret
-  globex_users:
-    file: ./secrets/globex/users.json
+  globex_oidc_client_secret:
+    file: ./secrets/globex/oidc_client_secret
+  globex_idm_ca:
+    file: ./secrets/globex/idm-tls/ca.pem

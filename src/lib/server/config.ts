@@ -33,17 +33,26 @@ export interface ElasticConfig {
 	requestTimeoutMs: number;
 }
 
+/** This tenant's OpenID Connect provider and the portal's client registration there. */
+export interface OidcConfig {
+	issuer: URL;
+	clientId: string;
+	clientSecret: string;
+	/** Group a user must be in, as named in the ID token's `groups` claim. */
+	requiredGroup: string;
+}
+
 interface AuthConfig {
 	sessionSecret: string;
 	sessionTtlSeconds: number;
-	/** username -> scrypt hash (see scripts/hash-password.mjs) */
-	users: Map<string, string>;
 	secureCookies: boolean;
 	/**
-	 * Public origins of this container (e.g. https://portal.acme.example); POSTs must
-	 * come from one of them. Several are allowed, e.g. an internal and a public hostname.
+	 * Public origins of this container (e.g. https://portal.acme.example). POSTs must
+	 * come from one of them, and each has a sign-in callback at `<origin>/auth/callback`.
+	 * Several are allowed, e.g. an internal and a public hostname.
 	 */
 	origins: string[];
+	oidc: OidcConfig;
 }
 
 export interface AppConfig {
@@ -87,23 +96,27 @@ function wholeNumber(env: Env, name: string, fallback: number, min: number): num
 
 const ID_RE = /^[a-z0-9][a-z0-9_-]{0,62}$/;
 
-/** Users: `alice:scrypt$...,bob:scrypt$...` or a JSON file `{ "alice": "scrypt$..." }`. */
-function parseUsers(env: Env): Map<string, string> {
-	const users = new Map<string, string>();
-	const file = env.PORTAL_USERS_FILE;
-	if (file) {
-		const parsed = JSON.parse(readFileSync(file, 'utf8')) as Record<string, string>;
-		for (const [u, h] of Object.entries(parsed)) users.set(u, h);
+/** `https://host[:port]`, without a path. */
+function origins(env: Env): string[] {
+	const values = list(env.ORIGIN).map((o) => o.replace(/\/+$/, ''));
+	if (!values.length) throw new ConfigError('ORIGIN must be set');
+	for (const o of values) {
+		if (!URL.canParse(o) || new URL(o).origin !== o)
+			throw new ConfigError(`ORIGIN "${o}" must be a scheme and host, e.g. https://portal.example`);
 	}
-	for (const entry of list(env.PORTAL_USERS)) {
-		const i = entry.indexOf(':');
-		if (i > 0) users.set(entry.slice(0, i), entry.slice(i + 1));
-	}
-	for (const [u, h] of users) {
-		if (!h.startsWith('scrypt$'))
-			throw new ConfigError(`password hash for user "${u}" is not a scrypt hash`);
-	}
-	return users;
+	return values;
+}
+
+function oidc(env: Env): OidcConfig {
+	const issuer = required(env, 'OIDC_ISSUER');
+	if (!URL.canParse(issuer) || new URL(issuer).protocol !== 'https:')
+		throw new ConfigError('OIDC_ISSUER must be an https URL');
+	return {
+		issuer: new URL(issuer),
+		clientId: required(env, 'OIDC_CLIENT_ID'),
+		clientSecret: required(env, 'OIDC_CLIENT_SECRET'),
+		requiredGroup: required(env, 'OIDC_REQUIRED_GROUP')
+	};
 }
 
 export function loadConfig(env: Env = process.env): AppConfig {
@@ -157,9 +170,9 @@ export function loadConfig(env: Env = process.env): AppConfig {
 		auth: {
 			sessionSecret,
 			sessionTtlSeconds: wholeNumber(env, 'SESSION_TTL_SECONDS', 8 * 3600, 60),
-			users: parseUsers(env),
 			secureCookies: env.COOKIE_SECURE !== 'false',
-			origins: list(env.ORIGIN).map((o) => o.replace(/\/+$/, ''))
+			origins: origins(env),
+			oidc: oidc(env)
 		}
 	};
 }

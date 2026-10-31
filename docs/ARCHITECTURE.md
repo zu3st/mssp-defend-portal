@@ -9,6 +9,8 @@
                       ▼
           Kibana Fleet / Endpoint APIs (space URL)  +  ES .alerts-security.alerts-<space>
                       (tenant-specific read-only API key)
+
+ Browser ──sign-in──▶ idm-<tenant> (Kanidm, one per customer) ──OIDC code──▶ portal-<tenant>
 ```
 
 - **One container serves one tenant.** The tenant (space, policies, namespaces, alias)
@@ -27,6 +29,8 @@
 | `src/lib/server/config.ts`   | Env parsing, tenant scope, fail-closed validation                      |
 | `src/lib/server/portal.ts`   | Tenant-bound facade used by all routes; second-layer scope checks      |
 | `src/lib/server/params.ts`   | Strict URL-parameter parsing (allowlists, clamps, date validation)     |
+| `src/lib/server/auth.ts`     | Signed session cookie bound to the tenant                              |
+| `src/lib/server/oidc.ts`     | Sign-in at the tenant's Kanidm (authorization code flow, PKCE)         |
 | `src/lib/server/normalize/*` | Raw Elastic → contract, per detection type                             |
 | `src/lib/server/elastic/*`   | Read-only HTTP client, KQL/DSL builders, real data source              |
 | `src/lib/server/mock/*`      | Generated Elastic-shaped multi-customer cluster + in-memory source     |
@@ -56,7 +60,11 @@
    the tenant's own policies; a filter with only other tenants' policies returns no results.
    Parameters such as `space`, `index` or `tenant` are ignored. Another tenant's agent or
    alert id returns 404, like a missing one.
-5. **Session binding.** Session cookies are HMAC-signed with a per-container secret and
+5. **Separate sign-in.** Each customer signs in at its own Kanidm, which issues tokens
+   for its portal only to members of `portal_users`. The portal accepts ID tokens only
+   from its configured issuer, for its own client id, and from members of
+   `OIDC_REQUIRED_GROUP`.
+6. **Session binding.** Session cookies are HMAC-signed with a per-container secret and
    carry the tenant id. A cookie from another tenant's container is rejected even if both
    containers were misconfigured with the same secret.
 
@@ -72,20 +80,26 @@ The tests cover each layer:
 - The HTTP client checks every Elastic request against an allowlist (GET on Fleet and
   Endpoint list/read routes, POST only to `<alerts alias>/_search`). Anything else throws
   before it is sent (see the `read-only request allowlist` tests).
-- The portal accepts only GET/HEAD, except the `login` and `logout` form actions (405
-  otherwise). Those POSTs must carry this container's `ORIGIN`.
+- The portal accepts only GET/HEAD, except the sign-out form (405 otherwise). That POST
+  must carry this container's `ORIGIN`.
 
 ## Authentication
 
-- **Built in:** local users (scrypt hashes) from a secrets file. Failed logins are limited
-  per client IP (20 per minute) and at most four password checks run at once. The session
-  is a stateless signed cookie (`HttpOnly`, `SameSite=Strict`, `Secure` unless disabled for
-  testing over plain HTTP). Removing a user from the configuration ends their sessions on
-  the next request.
-- **Production:** replace the login with OIDC/SAML, either in-app or behind an
-  authenticating reverse proxy. Map an IdP group or claim to _this_ container's tenant and
-  reject users without it. The tenant still comes from the container configuration. See
-  [PRODUCTION.md](PRODUCTION.md).
+- **One Kanidm per customer.** Users, passwords and sign-up links live there; the portal
+  stores no credentials. A new user gets a link to choose a password, which works once
+  and expires after 24 hours.
+- **OpenID Connect.** _Sign in_ sends the browser to Kanidm with an authorization code
+  request (PKCE, state and nonce). PKCE verifier, state, nonce and the page to return to
+  wait in a signed cookie for 10 minutes. The callback redeems the code with the client
+  secret and checks the ID token's issuer, audience, nonce and expiry, then the group
+  (`oauth4webapi`). Kanidm's metadata is fetched on the first sign-in and kept.
+- **Session.** After sign-in the portal issues its own stateless signed cookie
+  (`HttpOnly`, `SameSite=Lax`, `Secure` unless disabled for testing over plain HTTP) for
+  `SESSION_TTL_SECONDS`. `Lax` lets the browser send it on the redirect back from Kanidm;
+  the one POST, sign-out, must carry this container's `ORIGIN`. Disabling a user in
+  Kanidm stops new sign-ins; an open portal session runs until it expires.
+- **Sign-out** ends the portal session. Kanidm keeps its own session, so the next _Sign
+  in_ in that browser may go straight through.
 
 ## Time range and refresh
 

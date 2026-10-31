@@ -60,21 +60,41 @@ through the Fleet API can be given a readable id instead.
    openssl rand -base64 48 > secrets/contoso/session_secret
    ```
 
-3. **Create the users file.** Hash each password:
+3. **Run the customer's Kanidm**, where its users sign in, e.g. at
+   `https://idm.contoso.example` (see Kanidm's
+   [Preparing for your deployment](https://kanidm.github.io/kanidm/stable/preparing_for_your_deployment.html)).
+   Each customer gets its own. Register the portal there with Kanidm's CLI, logged in as
+   `idm_admin`:
 
    ```bash
-   docker run --rm -it -v "$PWD/scripts:/s:ro" node:24.22.1-alpine node /s/hash-password.mjs
+   kanidm group create portal_users
+   kanidm system oauth2 create portal-contoso "Contoso Defend Portal" https://portal.contoso.example
+   kanidm system oauth2 add-redirect-url portal-contoso https://portal.contoso.example/auth/callback
+   kanidm system oauth2 update-scope-map portal-contoso portal_users openid profile groups
+   kanidm system oauth2 prefer-short-username portal-contoso
+   kanidm system oauth2 disable-consent-prompt portal-contoso
+   kanidm system oauth2 show-basic-secret portal-contoso > secrets/contoso/oidc_client_secret
    ```
 
-   and list the users in `secrets/contoso/users.json`:
+   Kanidm asks for MFA or a passkey by default. For now, the portal's setup allows a
+   password alone:
 
-   ```json
-   { "jane.doe": "scrypt$…" }
+   ```bash
+   kanidm group account-policy credential-type-minimum idm_all_persons any
    ```
 
-   The container runs as uid 1000, which must be able to read these files.
+4. **Add the customer's users** in Kanidm and send each one a link where they choose their
+   password. The link works once and expires after 24 hours:
 
-4. **Build the image** once for all customers:
+   ```bash
+   kanidm person create jane.doe "Jane Doe"
+   kanidm group add-members portal_users jane.doe
+   kanidm person credential create-reset-token jane.doe --ttl 86400
+   ```
+
+   The same command gives a user a new link when they have lost their password.
+
+5. **Build the image** once for all customers:
 
    ```bash
    docker build -t mssp-defend-portal .
@@ -83,7 +103,7 @@ through the Fleet API can be given a readable id instead.
    The build also runs the type check and the tests. Alternatively, use the published
    `ghcr.io/zu3st/mssp-defend-portal` image (see [Releases](#releases)).
 
-5. **Run the customer's container:**
+6. **Run the customer's container:**
 
    ```bash
    docker run -d --name portal-contoso --read-only --tmpfs /tmp --cap-drop ALL \
@@ -96,38 +116,44 @@ through the Fleet API can be given a readable id instead.
      -e KIBANA_URL=https://kibana.example:5601 \
      -e ELASTIC_API_KEY_FILE=/run/secrets/elastic_api_key \
      -e SESSION_SECRET_FILE=/run/secrets/session_secret \
-     -e PORTAL_USERS_FILE=/run/secrets/users.json \
      -e ORIGIN=https://portal.contoso.example \
+     -e OIDC_ISSUER=https://idm.contoso.example/oauth2/openid/portal-contoso \
+     -e OIDC_CLIENT_ID=portal-contoso \
+     -e OIDC_CLIENT_SECRET_FILE=/run/secrets/oidc_client_secret \
+     -e OIDC_REQUIRED_GROUP=portal_users@idm.contoso.example \
      mssp-defend-portal
    ```
 
-6. **Publish it over TLS** through a reverse proxy or ingress at the `ORIGIN` address.
+   The container runs as uid 1000, which must be able to read the files in
+   `secrets/contoso`.
 
-Sign-in uses the local users file; single sign-on is not built in yet.
-[docs/PRODUCTION.md](docs/PRODUCTION.md) describes the options and what else to check
-before going live.
+7. **Publish it over TLS** through a reverse proxy or ingress at the `ORIGIN` address.
+
+[docs/PRODUCTION.md](docs/PRODUCTION.md) lists what else to check before going live.
 
 ## Configuration
 
-| Variable                             | Required     | Meaning                                                                                                 |
-| ------------------------------------ | ------------ | ------------------------------------------------------------------------------------------------------- |
-| `TENANT_ID`                          | yes          | Portal tenant id; sessions are bound to it                                                              |
-| `TENANT_NAME`                        | –            | Display name                                                                                            |
-| `KIBANA_SPACE_ID`                    | –            | Customer's Kibana space (default: `TENANT_ID`)                                                          |
-| `TENANT_AGENT_POLICY_IDS`            | yes          | Comma-separated Fleet agent policy ids (UUIDs unless set via the API)                                   |
-| `TENANT_NAMESPACES`                  | yes          | Data stream namespaces of this customer's policies                                                      |
-| `ALERTS_INDEX`                       | –            | Default `.alerts-security.alerts-<space>`                                                               |
-| `DATA_SOURCE`                        | –            | `mock` (default) or `elastic`                                                                           |
-| `ELASTICSEARCH_URL`, `KIBANA_URL`    | elastic      | Elasticsearch and Kibana URLs as the container reaches them                                             |
-| `ELASTIC_API_KEY[_FILE]`             | elastic      | Tenant-specific read-only API key (encoded form)                                                        |
-| `ELASTIC_TIMEOUT_MS`                 | –            | Timeout of each Elastic request, default 10000                                                          |
-| `NODE_EXTRA_CA_CERTS`                | –            | CA bundle for the Elastic TLS certificates                                                              |
-| `SESSION_SECRET[_FILE]`              | yes          | At least 32 characters; unique per container                                                            |
-| `PORTAL_USERS_FILE` / `PORTAL_USERS` | yes          | JSON `{user: scryptHash}` / `user:hash,…`                                                               |
-| `ORIGIN`                             | recommended  | Public origin(s), comma-separated, e.g. `https://portal.acme.example`; POSTs must come from one of them |
-| `COOKIE_SECURE`                      | –            | `true` by default; `false` only for local testing over plain HTTP                                       |
-| `SESSION_TTL_SECONDS`                | –            | Default 8 hours                                                                                         |
-| `ADDRESS_HEADER`, `XFF_DEPTH`        | behind proxy | Where the proxy puts the client IP, e.g. `X-Forwarded-For`; failed logins are limited per client IP     |
+| Variable                          | Required | Meaning                                                                                                 |
+| --------------------------------- | -------- | ------------------------------------------------------------------------------------------------------- |
+| `TENANT_ID`                       | yes      | Portal tenant id; sessions are bound to it                                                              |
+| `TENANT_NAME`                     | –        | Display name                                                                                            |
+| `KIBANA_SPACE_ID`                 | –        | Customer's Kibana space (default: `TENANT_ID`)                                                          |
+| `TENANT_AGENT_POLICY_IDS`         | yes      | Comma-separated Fleet agent policy ids (UUIDs unless set via the API)                                   |
+| `TENANT_NAMESPACES`               | yes      | Data stream namespaces of this customer's policies                                                      |
+| `ALERTS_INDEX`                    | –        | Default `.alerts-security.alerts-<space>`                                                               |
+| `DATA_SOURCE`                     | –        | `mock` (default) or `elastic`                                                                           |
+| `ELASTICSEARCH_URL`, `KIBANA_URL` | elastic  | Elasticsearch and Kibana URLs as the container reaches them                                             |
+| `ELASTIC_API_KEY[_FILE]`          | elastic  | Tenant-specific read-only API key (encoded form)                                                        |
+| `ELASTIC_TIMEOUT_MS`              | –        | Timeout of each Elastic request, default 10000                                                          |
+| `NODE_EXTRA_CA_CERTS`             | –        | CA bundle for Elastic and Kanidm certificates from a private CA                                         |
+| `SESSION_SECRET[_FILE]`           | yes      | At least 32 characters; unique per container                                                            |
+| `ORIGIN`                          | yes      | Public origin(s), comma-separated, e.g. `https://portal.acme.example`; POSTs must come from one of them |
+| `OIDC_ISSUER`                     | yes      | The customer's Kanidm issuer, `https://<kanidm>/oauth2/openid/<client>`                                 |
+| `OIDC_CLIENT_ID`                  | yes      | The portal's OAuth2 client name in that Kanidm                                                          |
+| `OIDC_CLIENT_SECRET[_FILE]`       | yes      | Its basic secret (`kanidm system oauth2 show-basic-secret`)                                             |
+| `OIDC_REQUIRED_GROUP`             | yes      | Group a user must be in, as the ID token names it, e.g. `portal_users@idm.contoso.example`              |
+| `COOKIE_SECURE`                   | –        | `true` by default; `false` only for local testing over plain HTTP                                       |
+| `SESSION_TTL_SECONDS`             | –        | Default 8 hours                                                                                         |
 
 `/healthz` reports that the portal runs and `/readyz` that it reaches Kibana; both work
 without a login, for health probes.
@@ -135,19 +161,26 @@ without a login, for health probes.
 ## Trying it out
 
 The portal runs on generated, Elastic-shaped data without an Elastic stack. This starts
-two customers, `acme` and `globex`:
+two customers, `acme` and `globex`, each with its own Kanidm:
+
+```bash
+docker compose build
+```
 
 ```bash
 ./scripts/lab-init.sh
 ```
 
 ```bash
-docker compose up -d --build
+docker compose up -d
 ```
 
-The first command creates a session secret and a demo user per customer and prints the
-passwords once. The Acme portal is then on <http://localhost:3101> (user `acme.analyst`)
-and the Globex portal on <http://localhost:3102> (user `globex.analyst`).
+`lab-init.sh` creates the secrets, sets up both Kanidm instances with a demo user each
+(`acme.analyst`, `globex.analyst`) and prints a link per user to choose a password. Run it
+again for new links. The Acme portal is then on <http://localhost:3101> and the Globex
+portal on <http://localhost:3102>. Their Kanidm instances use a self-signed lab
+certificate, so the browser warns once per instance
+(<https://idm-acme.localhost:8443>, <https://idm-globex.localhost:8444>).
 
 The project also has its own Elastic 9.5.5 lab stack in `lab/`. Start it as described in
 [docs/LAB.md](docs/LAB.md), then connect the portals to it:
@@ -160,7 +193,7 @@ docker compose -f compose.yaml -f compose.elastic.yaml up -d --build
 running portals:
 
 ```bash
-A_USER=acme.analyst A_PASS='…' B_USER=globex.analyst B_PASS='…' ./scripts/e2e-lab.sh
+./scripts/e2e-lab.sh
 ```
 
 ## Releases
@@ -187,11 +220,13 @@ docker run --rm -u "$(id -u):$(id -g)" -e HOME=/tmp -v "$PWD":/app -w /app node:
 ```
 
 ```bash
-docker run --rm -it -u "$(id -u):$(id -g)" -e HOME=/tmp -v "$PWD":/app -v "$PWD/secrets/acme:/run/secrets:ro" --env-file .env.example -e COOKIE_SECURE=false -p 5173:5173 -w /app node:24.22.1-alpine npx vite dev --host 0.0.0.0
+docker run --rm -it -u "$(id -u):$(id -g)" -e HOME=/tmp -v "$PWD":/app -v "$PWD/secrets/acme:/run/secrets:ro" --env-file .env.example --network mssp-defend-portal -p 5173:5173 -w /app node:24.22.1-alpine npx vite dev --host 0.0.0.0
 ```
 
 The commands install the dependencies, run the type check and the tests, and start a
 development server for the `acme` customer with generated data on <http://localhost:5173>.
+It signs in at the lab's Acme Kanidm, so run `./scripts/lab-init.sh` first (see
+[Trying it out](#trying-it-out)).
 
 ## Repository layout
 
@@ -203,7 +238,7 @@ development server for the `acme` customer with generated data on <http://localh
 - `src/lib/server/normalize/`: Elastic documents to the portal's data contract
 - `src/lib/server/mock/`: generated Elastic-shaped data for several customers
 - `lab/`: Elastic lab stack, tenant setup and alert feeder
-- `scripts/`: lab secrets, password hashing and HTTP checks
+- `scripts/`: lab secrets and Kanidm setup, HTTP checks
 - `.github/workflows/`: container build and publishing
 - `docs/`: architecture, Elastic APIs and privileges, lab, dependencies, production
   readiness

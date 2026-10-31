@@ -26,12 +26,11 @@ export const en = {
 	language: { label: 'Language' },
 	auth: {
 		signIn: 'Sign in',
-		signingIn: 'Signing in…',
+		signInHint: 'You sign in on your organization’s sign-in page.',
 		signOut: 'Sign out',
-		username: 'Username',
-		password: 'Password',
-		invalid: 'Invalid username or password.',
-		tooMany: 'Too many login attempts. Please wait a minute and try again.',
+		failed: 'Sign-in did not complete. Please try again.',
+		denied: 'Your account has no access to this portal.',
+		unavailable: 'The sign-in service is currently unavailable. Please try again shortly.',
 		crossSite: 'Cross-site form submissions are forbidden'
 	},
 	errors: {

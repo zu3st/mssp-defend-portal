@@ -26,12 +26,12 @@ export const de: Messages = {
 	language: { label: 'Sprache' },
 	auth: {
 		signIn: 'Anmelden',
-		signingIn: 'Anmeldung läuft…',
+		signInHint: 'Sie melden sich auf der Anmeldeseite Ihrer Organisation an.',
 		signOut: 'Abmelden',
-		username: 'Benutzername',
-		password: 'Passwort',
-		invalid: 'Benutzername oder Passwort ist falsch.',
-		tooMany: 'Zu viele Anmeldeversuche. Bitte warten Sie eine Minute und versuchen Sie es erneut.',
+		failed: 'Die Anmeldung wurde nicht abgeschlossen. Bitte versuchen Sie es erneut.',
+		denied: 'Ihr Konto hat keinen Zugriff auf dieses Portal.',
+		unavailable:
+			'Der Anmeldedienst ist derzeit nicht verfügbar. Bitte versuchen Sie es in Kürze erneut.',
 		crossSite: 'Formularübermittlungen von anderen Websites sind nicht erlaubt'
 	},
 	errors: {

@@ -17,8 +17,8 @@
   `search_after` and a point-in-time.
 - **Alert search** uses case-insensitive wildcards over a small fixed field set. It is
   bounded but not tuned for very large indices.
-- **Login throttling** is in memory and per container. Behind a proxy it needs
-  `ADDRESS_HEADER` to see client IPs.
+- **Ending access** takes effect at the next sign-in: a user disabled in Kanidm keeps an
+  open portal session until it expires (`SESSION_TTL_SECONDS`, default 8 hours).
 - **Relative times** ("2 minutes ago") change only when the page reloads its data: on
   navigation, Refresh, the time picker's auto-refresh, or the agent pages' 30-second refresh.
 
@@ -26,9 +26,12 @@
 
 **Authentication / SSO**
 
-- Use OIDC (Entra ID, Keycloak, …) in-app, or oauth2-proxy in front. Require an IdP
-  group or claim equal to the container's tenant.
-- Remove local users, or keep them only for break-glass access.
+- Run one Kanidm per customer behind TLS with a real certificate, and back up its
+  database (Kanidm's online backups).
+- Kanidm asks for MFA or a passkey by default; the setup currently lowers this to a
+  password alone (`credential-type-minimum any`). Raise it again where customers can use
+  passkeys or authenticator apps.
+- Send sign-up links over a channel only the user can read.
 
 **Tenant mapping**
 
@@ -42,16 +45,17 @@
 
 **Secrets**
 
-- Mount the API key and session secret as Kubernetes Secrets (`*_FILE`). Consider External
-  Secrets or Vault.
+- Mount the API key, session secret and OIDC client secret as Kubernetes Secrets
+  (`*_FILE`). Consider External Secrets or Vault.
 - Rotate API keys with an expiry, and give each key `metadata.portal_tenant`.
 
 **TLS and network**
 
-- Put an ingress in front with TLS, and set `ORIGIN` and `COOKIE_SECURE=true`.
+- Put an ingress in front with TLS at the `ORIGIN` address.
 - Add a NetworkPolicy: ingress only from the ingress controller; egress only to ES/Kibana
-  services and DNS.
-- Use the ECK CA via `NODE_EXTRA_CA_CERTS`.
+  services, the customer's Kanidm and DNS.
+- Use the ECK CA via `NODE_EXTRA_CA_CERTS`, in one bundle with Kanidm's CA if that is
+  private too.
 
 **Container**
 
@@ -68,7 +72,7 @@
 
 **Logging**
 
-- Logs go to stdout as JSON and include login success and failure, Elastic unavailability,
+- Logs go to stdout as JSON and include sign-in success and failure, Elastic unavailability,
   and `TENANT SCOPE VIOLATION`. Alert on the last one.
 - Add a request id and access logs at the ingress.
 
@@ -76,11 +80,11 @@
 
 - Track Elastic latency and error rate, optionally as Prometheus metrics.
 
-**Scalability and rate limits**
+**Scalability**
 
 - Each page load makes 2–5 Kibana/ES calls for live data; reference data and the overview's
   Defend sweep are cached (see [ARCHITECTURE.md](ARCHITECTURE.md#load-on-elastic)).
-- Run 1–2 replicas per tenant; the app is stateless apart from the login limiter.
+- Run 1–2 replicas per tenant; the app is stateless.
 - Watch Kibana load if there are many tenants.
 
 **Version compatibility**
@@ -91,8 +95,7 @@
 
 ## Recommended next steps
 
-1. Add OIDC (see Authentication above).
-2. Verify memory signature alerts from a real host (see
+1. Verify memory signature alerts from a real host (see
    [ELASTIC.md](ELASTIC.md#still-to-verify)).
-3. Optionally add read-only views of endpoint policy and exclusions, behind the same
+2. Optionally add read-only views of endpoint policy and exclusions, behind the same
    scoping.

@@ -1,29 +1,17 @@
 <script lang="ts">
-	import { enhance } from '$app/forms';
 	import LoginBackdrop from '#lib/components/LoginBackdrop.svelte';
-	import { ShieldCheck } from '@lucide/svelte';
+	import { ArrowRight, ShieldCheck } from '@lucide/svelte';
 	import { t } from '#lib/i18n/index.svelte.ts';
 	import type { PageProps } from './$types';
 
-	let { form, data }: PageProps = $props();
-	let busy = $state(false);
+	let { data }: PageProps = $props();
 </script>
 
 <svelte:head><title>{t().auth.signIn} · {data.tenantName}</title></svelte:head>
 
 <div class="relative isolate flex min-h-dvh items-center justify-center p-4">
 	<LoginBackdrop />
-	<form
-		method="POST"
-		class="card w-full max-w-sm space-y-4 p-6"
-		use:enhance={() => {
-			busy = true;
-			return async ({ update }) => {
-				await update();
-				busy = false;
-			};
-		}}
-	>
+	<div class="card w-full max-w-sm space-y-5 p-6">
 		<div class="flex items-center gap-2.5">
 			<ShieldCheck size={22} class="text-accent" />
 			<div>
@@ -31,36 +19,22 @@
 				<div class="text-[12px] text-muted">{data.tenantName}</div>
 			</div>
 		</div>
-		{#if form?.message}
+		{#if data.error}
 			<div
 				class="rounded-md bg-[var(--bad-bg)] px-3 py-2 text-[13px] text-[var(--bad)]"
 				role="alert"
 			>
-				{form.message}
+				{t().auth[data.error]}
 			</div>
 		{/if}
-		<label class="block space-y-1">
-			<span class="text-[13px] text-muted">{t().auth.username}</span>
-			<input
-				class="input w-full"
-				name="username"
-				autocomplete="username"
-				required
-				value={form?.username ?? ''}
-			/>
-		</label>
-		<label class="block space-y-1">
-			<span class="text-[13px] text-muted">{t().auth.password}</span>
-			<input
-				class="input w-full"
-				type="password"
-				name="password"
-				autocomplete="current-password"
-				required
-			/>
-		</label>
-		<button class="btn btn-primary w-full justify-center" disabled={busy}
-			>{busy ? t().auth.signingIn : t().auth.signIn}</button
+		<a
+			class="btn btn-primary group h-10 w-full justify-center text-[14px]"
+			href="/auth/login?next={encodeURIComponent(data.next)}"
+			data-sveltekit-reload
 		>
-	</form>
+			{t().auth.signIn}
+			<ArrowRight size={16} class="transition-transform group-hover:translate-x-0.5" />
+		</a>
+		<p class="text-center text-[12px] text-muted">{t().auth.signInHint}</p>
+	</div>
 </div>

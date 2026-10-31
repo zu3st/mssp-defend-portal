@@ -6,8 +6,8 @@
 # mssp-lab_default). Prerequisite: secrets/<tenant>/elastic_api_key, a
 # tenant-specific read-only API key (encoded form); lab/setup.mjs creates them.
 #
-# For a TLS stack (e.g. ECK), override the URLs and add the CA:
-#   NODE_EXTRA_CA_CERTS: /run/secrets/ca_crt   + a ca_crt secret per service.
+# For a TLS stack (e.g. ECK), override the URLs and add its CA to the bundle in
+# NODE_EXTRA_CA_CERTS, which holds the Kanidm CA in compose.yaml.
 
 x-elastic-env: &elastic-env
   DATA_SOURCE: elastic

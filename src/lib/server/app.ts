@@ -3,10 +3,9 @@ import type { DataSource } from './datasource/types';
 import { ElasticDataSource } from './elastic/source';
 import { MockDataSource } from './mock/source';
 import { Portal } from './portal';
-import { LoginRateLimiter } from './auth';
 
 /** Process-wide singletons. One container = one tenant = one Portal. */
-let state: { config: AppConfig; portal: Portal; limiter: LoginRateLimiter } | undefined;
+let state: { config: AppConfig; portal: Portal } | undefined;
 
 export function app() {
 	if (!state) {
@@ -15,14 +14,14 @@ export function app() {
 			config.dataSource === 'elastic'
 				? new ElasticDataSource(config.elastic!)
 				: new MockDataSource();
-		state = { config, portal: new Portal(config.tenant, source), limiter: new LoginRateLimiter() };
+		state = { config, portal: new Portal(config.tenant, source) };
 		console.info(
 			JSON.stringify({
 				msg: 'portal started',
 				tenant: config.tenant.id,
 				space: config.tenant.spaceId,
 				dataSource: config.dataSource,
-				users: config.auth.users.size
+				issuer: config.auth.oidc.issuer.href
 			})
 		);
 	}

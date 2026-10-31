@@ -12,7 +12,7 @@ import {
 	parseAcceptLanguage
 } from '#lib/i18n/index.svelte.ts';
 
-const PUBLIC_PATHS = new Set(['/login', '/healthz', '/readyz']);
+const PUBLIC_PATHS = new Set(['/login', '/auth/login', '/auth/callback', '/healthz', '/readyz']);
 const THEMES = new Set(['light', 'dark']);
 
 export const handle: Handle = async ({ event, resolve }) => {
@@ -39,22 +39,19 @@ export const handle: Handle = async ({ event, resolve }) => {
 		? langCookie
 		: negotiate(parseAcceptLanguage(event.request.headers.get('accept-language')));
 
-	// The portal is read-only: only the login/logout form actions may POST.
+	// The portal is read-only: only the sign-out form may POST.
 	if (event.request.method !== 'GET' && event.request.method !== 'HEAD') {
-		if (!['/login', '/logout'].includes(path))
-			return new Response('Method not allowed', { status: 405 });
+		if (path !== '/logout') return new Response('Method not allowed', { status: 405 });
 		if (!isSameOrigin(event.request, config.auth.origins)) {
 			return new Response(messages(event.locals.locale).auth.crossSite, { status: 403 });
 		}
 	}
 
-	const decoded = decodeSession(
+	const session = decodeSession(
 		event.cookies.get(SESSION_COOKIE),
 		config.auth.sessionSecret,
 		config.tenant.id
 	);
-	// Removing a user from the configuration ends their sessions on the next request.
-	const session = decoded && config.auth.users.has(decoded.user) ? decoded : null;
 	event.locals.user = session?.user;
 	event.locals.tenantName = config.tenant.name;
 

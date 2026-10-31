@@ -200,7 +200,12 @@ describe('config', () => {
 		TENANT_ID: 'acme',
 		TENANT_AGENT_POLICY_IDS: 'p1',
 		TENANT_NAMESPACES: 'acme',
-		SESSION_SECRET: 's'.repeat(32)
+		SESSION_SECRET: 's'.repeat(32),
+		ORIGIN: 'https://portal.acme.example',
+		OIDC_ISSUER: 'https://idm.acme.example/oauth2/openid/portal-acme',
+		OIDC_CLIENT_ID: 'portal-acme',
+		OIDC_CLIENT_SECRET: 'secret',
+		OIDC_REQUIRED_GROUP: 'portal_users@idm.acme.example'
 	};
 
 	it('requires tenant policies and namespaces (fail closed)', () => {
@@ -220,6 +225,20 @@ describe('config', () => {
 			3600
 		);
 		expect(loadConfig(base).auth.sessionTtlSeconds).toBe(8 * 3600);
+	});
+
+	it('requires a public origin and an https identity provider', () => {
+		expect(() => loadConfig({ ...base, ORIGIN: '' })).toThrow(/ORIGIN/);
+		expect(() => loadConfig({ ...base, ORIGIN: 'https://portal.acme.example/app' })).toThrow(
+			/ORIGIN/
+		);
+		expect(() => loadConfig({ ...base, OIDC_ISSUER: 'http://idm.acme.example' })).toThrow(
+			/OIDC_ISSUER/
+		);
+		expect(() => loadConfig({ ...base, OIDC_REQUIRED_GROUP: '' })).toThrow(/OIDC_REQUIRED_GROUP/);
+		expect(
+			loadConfig({ ...base, ORIGIN: 'https://a.example/, https://b.example' }).auth.origins
+		).toEqual(['https://a.example', 'https://b.example']);
 	});
 
 	it('derives the space alias', () => {

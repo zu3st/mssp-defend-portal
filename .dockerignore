@@ -3,7 +3,6 @@ build
 .svelte-kit
 .git
 secrets
-config/*/users.json
 *.log
 .env
 .env.*

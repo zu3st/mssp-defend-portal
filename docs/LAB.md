@@ -73,7 +73,8 @@ docker run --rm --network mssp-lab_default -v "$PWD":/app -w /app --env-file lab
 ```
 
 Wait about a minute after feeding before triaging, so the rule has promoted the documents.
-Then start the portals against the lab:
+Then start the portals against the lab, after `./scripts/lab-init.sh` (see the README's
+_Trying it out_):
 
 ```bash
 docker compose -f compose.yaml -f compose.elastic.yaml up -d --build
