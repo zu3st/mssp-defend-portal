@@ -38,7 +38,7 @@
 			transparent
 		);
 	}
-	/* Eased stops: a straight fade to transparent leaves a visible rim. */
+	/* A wide band with eased stops, so the light rises and falls gently across the dots. */
 	.ring {
 		position: absolute;
 		left: 50%;
@@ -46,14 +46,22 @@
 		width: 110cqmax;
 		aspect-ratio: 1;
 		margin: -55cqmax 0 0 -55cqmax;
+		/* Round, so GPUs that draw a scaled layer's edge show no square through the dots. */
+		border-radius: 50%;
 		background: radial-gradient(
 			circle closest-side,
-			transparent 58%,
-			color-mix(in srgb, var(--backdrop-wave) 15%, transparent) 68%,
-			color-mix(in srgb, var(--backdrop-wave) 60%, transparent) 76%,
-			var(--backdrop-wave) 82%,
-			color-mix(in srgb, var(--backdrop-wave) 55%, transparent) 89%,
-			color-mix(in srgb, var(--backdrop-wave) 12%, transparent) 95%,
+			transparent 18%,
+			color-mix(in srgb, var(--backdrop-wave) 4%, transparent) 28%,
+			color-mix(in srgb, var(--backdrop-wave) 14%, transparent) 36%,
+			color-mix(in srgb, var(--backdrop-wave) 32%, transparent) 44%,
+			color-mix(in srgb, var(--backdrop-wave) 58%, transparent) 51%,
+			color-mix(in srgb, var(--backdrop-wave) 84%, transparent) 57%,
+			var(--backdrop-wave) 62%,
+			color-mix(in srgb, var(--backdrop-wave) 84%, transparent) 67%,
+			color-mix(in srgb, var(--backdrop-wave) 58%, transparent) 73%,
+			color-mix(in srgb, var(--backdrop-wave) 32%, transparent) 80%,
+			color-mix(in srgb, var(--backdrop-wave) 14%, transparent) 87%,
+			color-mix(in srgb, var(--backdrop-wave) 4%, transparent) 94%,
 			transparent
 		);
 		opacity: 0;
@@ -70,7 +78,7 @@
 			opacity: 1;
 		}
 		100% {
-			transform: scale(1.2);
+			transform: scale(1.4);
 			opacity: 0;
 		}
 	}
