@@ -4,7 +4,8 @@
 #   secrets/<tenant>/idm-tls/             the tenant Kanidm's self-signed lab CA and certificate
 #   secrets/<tenant>/oidc_client_secret   the portal's client secret at that Kanidm
 # In each tenant's Kanidm it sets up the portal's OAuth2 client, the group
-# portal_users and a demo user <tenant>.analyst, then prints a sign-up link for
+# portal_users and a demo user <tenant>.analyst, shows the customer's name and
+# the portal's logo on its pages, then prints a sign-up link for
 # the demo user (valid 24 hours). Acme's client also accepts the development
 # server on port 5173 (see README, Development). Run it again for fresh links;
 # existing secrets and Kanidm entries are kept.
@@ -14,8 +15,8 @@ NODE_IMAGE="node:24.22.1-alpine"
 
 for tenant in acme globex; do
 	case "$tenant" in
-	acme) name="Acme" idm_port=8443 portal="http://localhost:3101" dev="http://localhost:5173" ;;
-	globex) name="Globex" idm_port=8444 portal="http://localhost:3102" dev="" ;;
+	acme) name="Acme" org="Acme Corp" idm_port=8443 portal="http://localhost:3101" dev="http://localhost:5173" ;;
+	globex) name="Globex" org="Globex Inc" idm_port=8444 portal="http://localhost:3102" dev="" ;;
 	esac
 	idm="idm-$tenant"
 	dir="secrets/$tenant"
@@ -30,13 +31,15 @@ for tenant in acme globex; do
 		echo "created $dir/idm-tls (lab CA and certificate for $idm.localhost)"
 	fi
 	docker compose up -d "$idm" 2> /dev/null
-	admin_password="$(docker compose exec -T "$idm" kanidmd recover-account idm_admin 2>&1 | sed -n 's/.*new_password: "\(.*\)".*/\1/p')"
+	recover() { docker compose exec -T "$idm" kanidmd recover-account "$1" 2>&1 | sed -n 's/.*new_password: "\(.*\)".*/\1/p'; }
+	idm_admin_password="$(recover idm_admin)"
+	admin_password="$(recover admin)"
 
 	out="$(docker compose run --rm -T --no-deps \
-		-v "$PWD/$dir/idm-tls:/tls:ro" \
+		-v "$PWD/$dir/idm-tls:/tls:ro" -v "$PWD/kanidm/logo.svg:/logo.svg:ro" \
 		-e KANIDM_URL="https://$idm.localhost:$idm_port" -e KANIDM_CA_PATH=/tls/ca.pem \
-		-e KANIDM_NAME=idm_admin -e KANIDM_PASSWORD="$admin_password" \
-		-e TENANT="$tenant" -e NAME="$name" -e PORTAL="$portal" -e DEV="$dev" \
+		-e KANIDM_NAME=idm_admin -e KANIDM_PASSWORD="$idm_admin_password" -e ADMIN_PASSWORD="$admin_password" \
+		-e TENANT="$tenant" -e NAME="$name" -e ORG="$org" -e PORTAL="$portal" -e DEV="$dev" \
 		idm-cli -s 2> /dev/null << 'EOF'
 set -e
 tries=0
@@ -58,9 +61,14 @@ if ! kanidm system oauth2 get "$client" | grep -q '^name: '; then
 	kanidm system oauth2 prefer-short-username "$client" > /dev/null
 	kanidm system oauth2 disable-consent-prompt "$client" > /dev/null
 fi
+kanidm system oauth2 set-image "$client" /logo.svg > /dev/null
 [ -z "$DEV" ] || kanidm system oauth2 add-redirect-url "$client" "$DEV/auth/callback" > /dev/null
 # For now, a password alone is enough to sign in. Kanidm's default asks for MFA or a passkey.
 kanidm group account-policy credential-type-minimum idm_all_persons any > /dev/null
+# The domain's name and image need Kanidm's admin account.
+KANIDM_PASSWORD="$ADMIN_PASSWORD" kanidm login -D admin > /dev/null
+kanidm system domain set-displayname -D admin "$ORG" > /dev/null
+kanidm system domain set-image -D admin /logo.svg > /dev/null
 echo "secret: $(kanidm system oauth2 show-basic-secret "$client")"
 echo "link: $(kanidm person credential create-reset-token "$user" --ttl 86400 | grep -o 'https://[^ ]*/ui/reset?token=[^ ]*' | head -1)"
 EOF

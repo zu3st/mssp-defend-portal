@@ -1,0 +1,139 @@
+/* The Defend Portal look for Kanidm's pages, mounted over /hpkg/override.css: the
+   portal's colours and type through Bootstrap's variables, and its sign-in card. */
+:root,
+[data-bs-theme='light'] {
+	--portal-canvas: #f6f7f9;
+	--portal-surface: #ffffff;
+	--portal-dot: rgb(95 107 122 / 0.2);
+	--bs-body-bg: #f6f7f9;
+	--bs-body-bg-rgb: 246, 247, 249;
+	--bs-body-color: #111827;
+	--bs-secondary-color: #5f6b7a;
+	--bs-tertiary-bg: #f1f3f6;
+	--bs-tertiary-bg-rgb: 241, 243, 246;
+	--bs-border-color: #e3e6eb;
+	--bs-primary: #2563eb;
+	--bs-primary-rgb: 37, 99, 235;
+	--bs-link-color: #2563eb;
+	--bs-link-color-rgb: 37, 99, 235;
+	--bs-link-hover-color: #1d4ed8;
+	--bs-link-hover-color-rgb: 29, 78, 216;
+	--portal-accent-fg: #ffffff;
+	--bs-success: #15803d;
+	--bs-success-rgb: 21, 128, 61;
+	--bs-danger: #c81e1e;
+	--bs-danger-rgb: 200, 30, 30;
+}
+[data-bs-theme='dark'] {
+	--portal-canvas: #0b0e13;
+	--portal-surface: #12161d;
+	--portal-dot: rgb(141 152 168 / 0.16);
+	--bs-body-bg: #0b0e13;
+	--bs-body-bg-rgb: 11, 14, 19;
+	--bs-body-color: #e5e9ef;
+	--bs-secondary-color: #8d98a8;
+	--bs-tertiary-bg: #181d26;
+	--bs-tertiary-bg-rgb: 24, 29, 38;
+	--bs-border-color: #252c38;
+	--bs-primary: #5b8def;
+	--bs-primary-rgb: 91, 141, 239;
+	--bs-link-color: #5b8def;
+	--bs-link-color-rgb: 91, 141, 239;
+	--bs-link-hover-color: #7aa2f7;
+	--bs-link-hover-color-rgb: 122, 162, 247;
+	--portal-accent-fg: #0b0e13;
+	--bs-success: #4ade80;
+	--bs-success-rgb: 74, 222, 128;
+	--bs-danger: #f87171;
+	--bs-danger-rgb: 248, 113, 113;
+}
+:root {
+	--bs-body-font-family:
+		ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+	--bs-body-font-size: 14px;
+	--bs-border-radius: 0.375rem;
+	--bs-focus-ring-color: rgb(var(--bs-primary-rgb) / 0.25);
+}
+body {
+	-webkit-font-smoothing: antialiased;
+}
+.btn-primary {
+	--bs-btn-bg: var(--bs-primary);
+	--bs-btn-border-color: transparent;
+	--bs-btn-color: var(--portal-accent-fg);
+	--bs-btn-hover-bg: var(--bs-primary);
+	--bs-btn-hover-border-color: transparent;
+	--bs-btn-hover-color: var(--portal-accent-fg);
+	--bs-btn-active-bg: var(--bs-primary);
+	--bs-btn-active-border-color: transparent;
+	--bs-btn-active-color: var(--portal-accent-fg);
+	font-weight: 500;
+}
+.btn-success {
+	--bs-btn-bg: var(--bs-success);
+	--bs-btn-border-color: transparent;
+	--bs-btn-color: var(--portal-accent-fg);
+	--bs-btn-hover-bg: var(--bs-success);
+	--bs-btn-hover-border-color: transparent;
+	--bs-btn-hover-color: var(--portal-accent-fg);
+	font-weight: 500;
+}
+.btn-danger {
+	--bs-btn-bg: var(--bs-danger);
+	--bs-btn-border-color: transparent;
+	--bs-btn-color: var(--portal-accent-fg);
+	--bs-btn-hover-bg: var(--bs-danger);
+	--bs-btn-hover-border-color: transparent;
+	--bs-btn-hover-color: var(--portal-accent-fg);
+	font-weight: 500;
+}
+.btn-primary:hover,
+.btn-success:hover,
+.btn-danger:hover {
+	filter: brightness(1.08);
+}
+.form-control:focus {
+	border-color: var(--bs-primary);
+	box-shadow: 0 0 0 0.2rem var(--bs-focus-ring-color);
+}
+.form-check-input:checked {
+	background-color: var(--bs-primary);
+	border-color: var(--bs-primary);
+}
+
+/* Sign-in: the portal's dot grid behind a card. */
+body:has(main.form-signin) {
+	background-image: radial-gradient(circle, var(--portal-dot) 1.25px, transparent 1.9px);
+	background-size: 28px 28px;
+}
+main.form-signin {
+	width: calc(100% - 2rem);
+	max-width: 24rem;
+	padding: 1.5rem;
+	/* Inputs inside take the card's colour. */
+	--bs-body-bg: var(--portal-surface);
+	background: var(--bs-body-bg);
+	border: 1px solid var(--bs-border-color);
+	border-radius: 0.5rem;
+}
+main.form-signin > div,
+main.form-signin form {
+	width: 100%;
+}
+main.form-signin .kanidm_logo {
+	width: 3rem;
+	height: 3rem;
+	margin-bottom: 0.5rem;
+}
+main.form-signin h3 {
+	font-size: 1rem;
+	font-weight: 600;
+	margin-bottom: 1.25rem;
+}
+main.form-signin .btn-primary {
+	width: 100%;
+	height: 2.5rem;
+}
+.footer {
+	--bs-tertiary-bg-rgb: var(--bs-body-bg-rgb);
+}

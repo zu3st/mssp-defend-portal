@@ -27,7 +27,7 @@ x-portal: &portal
     # Lab runs over plain HTTP; set to true (default) behind TLS.
     COOKIE_SECURE: 'false'
 
-# Kanidm, one per customer. The browser and the portal reach it under the same
+# Kanidm, one per customer, styled like the portal by kanidm/override.css. The browser and the portal reach it under the same
 # name: *.localhost resolves to this machine in browsers, and to this container
 # on the Compose network.
 x-idm: &idm
@@ -75,6 +75,7 @@ services:
     volumes:
       - idm-acme:/data
       - ./secrets/acme/idm-tls:/tls
+      - ./kanidm/override.css:/hpkg/override.css:ro
     networks:
       default:
         aliases: [idm-acme.localhost]
@@ -115,6 +116,7 @@ services:
     volumes:
       - idm-globex:/data
       - ./secrets/globex/idm-tls:/tls
+      - ./kanidm/override.css:/hpkg/override.css:ro
     networks:
       default:
         aliases: [idm-globex.localhost]

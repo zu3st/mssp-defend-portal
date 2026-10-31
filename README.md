@@ -83,6 +83,16 @@ through the Fleet API can be given a readable id instead.
    kanidm group account-policy credential-type-minimum idm_all_persons any
    ```
 
+   To give Kanidm's pages the portal's look, mount [kanidm/override.css](kanidm/override.css)
+   read-only over `/hpkg/override.css` in the Kanidm container, and set the customer's name
+   and the portal's logo, logged in as `admin` for the first two:
+
+   ```bash
+   kanidm system domain set-displayname -D admin "Contoso Ltd"
+   kanidm system domain set-image -D admin kanidm/logo.svg
+   kanidm system oauth2 set-image portal-contoso kanidm/logo.svg
+   ```
+
 4. **Add the customer's users** in Kanidm and send each one a link where they choose their
    password. The link works once and expires after 24 hours:
 
@@ -238,6 +248,7 @@ It signs in at the lab's Acme Kanidm, so run `./scripts/lab-init.sh` first (see
 - `src/lib/server/normalize/`: Elastic documents to the portal's data contract
 - `src/lib/server/mock/`: generated Elastic-shaped data for several customers
 - `lab/`: Elastic lab stack, tenant setup and alert feeder
+- `kanidm/`: the portal's look for Kanidm's pages (stylesheet and logo)
 - `scripts/`: lab secrets and Kanidm setup, HTTP checks
 - `.github/workflows/`: container build and publishing
 - `docs/`: architecture, Elastic APIs and privileges, lab, dependencies, production
