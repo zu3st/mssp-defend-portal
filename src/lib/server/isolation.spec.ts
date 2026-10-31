@@ -213,6 +213,15 @@ describe('config', () => {
 		expect(() => loadConfig({ ...base, DATA_SOURCE: 'elastic' })).toThrow(/ELASTICSEARCH_URL/);
 	});
 
+	it('rejects numbers that are not whole numbers', () => {
+		expect(() => loadConfig({ ...base, SESSION_TTL_SECONDS: '8h' })).toThrow(/SESSION_TTL_SECONDS/);
+		expect(() => loadConfig({ ...base, SESSION_TTL_SECONDS: '30' })).toThrow(/at least 60/);
+		expect(loadConfig({ ...base, SESSION_TTL_SECONDS: ' 3600 ' }).auth.sessionTtlSeconds).toBe(
+			3600
+		);
+		expect(loadConfig(base).auth.sessionTtlSeconds).toBe(8 * 3600);
+	});
+
 	it('derives the space alias', () => {
 		expect(loadConfig(base).tenant.alertsIndex).toBe('.alerts-security.alerts-acme');
 	});

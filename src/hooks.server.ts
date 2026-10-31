@@ -48,11 +48,13 @@ export const handle: Handle = async ({ event, resolve }) => {
 		}
 	}
 
-	const session = decodeSession(
+	const decoded = decodeSession(
 		event.cookies.get(SESSION_COOKIE),
 		config.auth.sessionSecret,
 		config.tenant.id
 	);
+	// Removing a user from the configuration ends their sessions on the next request.
+	const session = decoded && config.auth.users.has(decoded.user) ? decoded : null;
 	event.locals.user = session?.user;
 	event.locals.tenantName = config.tenant.name;
 

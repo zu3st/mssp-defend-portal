@@ -7,8 +7,8 @@
  * - Endpoint metadata: GET  {kibana}/s/{space}/api/endpoint/metadata
  * - Alerts:            POST {es}/.alerts-security.alerts-{space}/_search
  *
- * Only fields we read are typed; everything else is ignored. Mock fixtures use
- * exactly these shapes so the same normalizers run against mock and real data.
+ * Only the fields the portal reads are typed. Mock fixtures use these shapes,
+ * so the same normalizers run on mock and real data.
  */
 
 interface RawFleetComponentUnit {

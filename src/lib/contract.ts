@@ -1,10 +1,10 @@
 /**
  * Normalized data contract between the portal backend and the browser.
  *
- * Everything the browser ever receives is one of these shapes. They are built
- * by the normalizers in `#lib/server/normalize` from raw Elastic responses and
- * deliberately carry only allowlisted fields. Optional fields are omitted when
- * Elastic did not provide them; nothing is inferred.
+ * Everything the browser receives is one of these shapes. They are built by
+ * the normalizers in `#lib/server/normalize` from raw Elastic responses and
+ * carry only allowlisted fields. Optional fields are left out when Elastic does
+ * not provide them.
  */
 
 // ---------------------------------------------------------------------------
@@ -244,8 +244,7 @@ export interface HighlightedField {
 
 /**
  * Alert flyout data. Detection-type-specific fields are carried in
- * `highlighted` (built server-side from the field allowlist), not as typed
- * per-kind sections.
+ * `highlighted`, built server-side from the field allowlist.
  */
 export interface AlertDetail extends AlertSummary {
 	/**

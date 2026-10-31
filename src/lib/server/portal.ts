@@ -18,6 +18,7 @@ import type {
 	Severity,
 	TimeRange
 } from '#lib/contract.ts';
+import { TtlCache } from './cache';
 import type { TenantScope } from './config';
 import type { DataSource } from './datasource/types';
 import { LIMITS } from './datasource/types';
@@ -26,7 +27,8 @@ import {
 	strList,
 	type RawAlertHit,
 	type RawEndpointMetadata,
-	type RawFleetAgent
+	type RawFleetAgent,
+	type RawFleetAgentList
 } from './elastic/raw';
 import {
 	agentRow,
@@ -39,11 +41,17 @@ import {
 import { normalizeAlertDetail, normalizeAlertSummary } from './normalize/alerts';
 
 /**
- * Raised when a data source returns a record outside the tenant scope. This
- * indicates a bug or misconfiguration upstream; we fail closed and return
- * nothing rather than filtering silently.
+ * Raised when a data source returns a record outside the tenant scope. That
+ * means a bug or misconfiguration upstream, so the request fails instead of
+ * dropping the record silently.
  */
 export class ScopeViolationError extends Error {}
+
+/**
+ * The overview's Defend sweep reads every agent (up to 5,000), so it is shared
+ * for this long by all users and auto-refreshing tabs of the tenant.
+ */
+const DEFEND_SWEEP_TTL = 30_000;
 
 /** Raw Fleet status counts -> the statuses Kibana Fleet displays. */
 function groupCounts(raw: Partial<Record<string, number>>): FleetStatusCounts {
@@ -65,10 +73,12 @@ function groupCounts(raw: Partial<Record<string, number>>): FleetStatusCounts {
 }
 
 /**
- * Tenant-bound facade used by all routes. Construct once per container with
- * the configured scope; routes never pass scope information themselves.
+ * Tenant-bound facade used by all routes, built once per container with the
+ * configured scope.
  */
 export class Portal {
+	private cache = new TtlCache(10);
+
 	constructor(
 		readonly scope: TenantScope,
 		private source: DataSource
@@ -151,11 +161,20 @@ export class Portal {
 	}
 
 	async agents(q: AgentQuery): Promise<Page<AgentSummary>> {
+		const [page, ctx] = await Promise.all([this.agentPage(q), this.context()]);
+		return this.normalizeAgents(q, page, ctx);
+	}
+
+	private agentPage(q: AgentQuery, opts?: { metrics?: boolean }) {
 		const query = { ...q, policyIds: this.narrowPolicies(q.policyIds) };
-		const [res, ctx] = await Promise.all([
-			this.source.listAgents(this.scope, query),
-			this.context()
-		]);
+		return this.source.listAgents(this.scope, query, opts);
+	}
+
+	private async normalizeAgents(
+		q: AgentQuery,
+		res: RawFleetAgentList,
+		ctx: AgentContext
+	): Promise<Page<AgentSummary>> {
 		const items = res.items.map((a) => this.checkAgent(a));
 		const metas = await this.metadataFor(items);
 		return {
@@ -233,7 +252,13 @@ export class Portal {
 	 * attention: unhealthy/offline in Fleet, or a policy response that is not
 	 * success.
 	 */
-	async policyOverview(maxAgents = 5000) {
+	policyOverview(maxAgents = 5000) {
+		return this.cache.get(`defend-sweep|${maxAgents}`, DEFEND_SWEEP_TTL, () =>
+			this.sweepDefend(maxAgents)
+		);
+	}
+
+	private async sweepDefend(maxAgents: number) {
 		const counts: Record<PolicyStatus, number> = {
 			success: 0,
 			warning: 0,
@@ -245,8 +270,11 @@ export class Portal {
 		const pageSize = 500;
 		let seen = 0;
 		let truncated = false;
+		const ctx = await this.context();
 		for (let page = 1; ; page++) {
-			const res = await this.agents({ sort: 'hostname', dir: 'asc', page, pageSize });
+			const q: AgentQuery = { sort: 'hostname', dir: 'asc', page, pageSize };
+			// The overview shows no CPU/memory, so Fleet need not look them up.
+			const res = await this.normalizeAgents(q, await this.agentPage(q, { metrics: false }), ctx);
 			for (const a of res.items) {
 				if (['inactive', 'unenrolled', 'uninstalled'].includes(a.fleetStatusGroup)) continue;
 				counts[a.defend.status]++;

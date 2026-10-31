@@ -1,8 +1,7 @@
 import { readFileSync } from 'node:fs';
 
 /**
- * Container configuration. One portal container serves exactly one tenant;
- * the tenant binding comes from here and never from the request.
+ * Container configuration, including the one tenant this container serves.
  *
  * Secrets can be passed directly (`FOO`) or as a file path (`FOO_FILE`), which
  * is how Docker / Kubernetes secrets are usually mounted.
@@ -77,6 +76,15 @@ function list(value: string | undefined): string[] {
 		.filter(Boolean);
 }
 
+/** A whole number setting. A typo stops the container at startup. */
+function wholeNumber(env: Env, name: string, fallback: number, min: number): number {
+	const raw = env[name]?.trim();
+	if (!raw) return fallback;
+	if (!/^\d+$/.test(raw) || Number(raw) < min)
+		throw new ConfigError(`${name} must be a whole number of at least ${min}`);
+	return Number(raw);
+}
+
 const ID_RE = /^[a-z0-9][a-z0-9_-]{0,62}$/;
 
 /** Users: `alice:scrypt$...,bob:scrypt$...` or a JSON file `{ "alice": "scrypt$..." }`. */
@@ -134,7 +142,7 @@ export function loadConfig(env: Env = process.env): AppConfig {
 			elasticsearchUrl: required(env, 'ELASTICSEARCH_URL').replace(/\/+$/, ''),
 			kibanaUrl: required(env, 'KIBANA_URL').replace(/\/+$/, ''),
 			apiKey: required(env, 'ELASTIC_API_KEY'),
-			requestTimeoutMs: Number(env.ELASTIC_TIMEOUT_MS ?? 10_000)
+			requestTimeoutMs: wholeNumber(env, 'ELASTIC_TIMEOUT_MS', 10_000, 100)
 		};
 	}
 
@@ -148,7 +156,7 @@ export function loadConfig(env: Env = process.env): AppConfig {
 		elastic,
 		auth: {
 			sessionSecret,
-			sessionTtlSeconds: Number(env.SESSION_TTL_SECONDS ?? 8 * 3600),
+			sessionTtlSeconds: wholeNumber(env, 'SESSION_TTL_SECONDS', 8 * 3600, 60),
 			users: parseUsers(env),
 			secureCookies: env.COOKIE_SECURE !== 'false',
 			origins: list(env.ORIGIN).map((o) => o.replace(/\/+$/, ''))

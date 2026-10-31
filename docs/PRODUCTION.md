@@ -5,10 +5,12 @@
 - **Tested in a lab.** The portal ran against an Elastic 9.5.5 lab stack and an Elastic
   Defend host, not at production scale. The remaining checks are in
   [ELASTIC.md](ELASTIC.md#still-to-verify).
-- **Overview Defend counts** come from paging through the tenant's agents (capped at 5,000
-  per request, no cache). Large fleets need caching or a dedicated aggregation.
-- **Agent version facet** pages through up to 5,000 agents and is cached for 60 s, because
-  Fleet has no "distinct versions" API.
+- **Overview Defend counts** come from paging through the tenant's agents (capped at 5,000,
+  shared for 30 s). Very large fleets would need a dedicated aggregation.
+- **Agent version filter** lists at most 50 distinct versions (see
+  [ELASTIC.md](ELASTIC.md#apis-and-indices-used)).
+- **Caches are per container.** Replicas of one tenant each keep their own (see
+  [ARCHITECTURE.md](ARCHITECTURE.md#load-on-elastic)).
 - **Agent list sorting** covers Fleet fields only. Sorting by alert count would need all
   agents joined with alert counts.
 - **Alert paging** uses `from`/`size` up to 10,000 results. Deeper paging would need
@@ -76,8 +78,8 @@
 
 **Scalability and rate limits**
 
-- Each page load makes 2–5 Kibana/ES calls. Add a short TTL cache (10–30 s) for overview,
-  facets and status counts.
+- Each page load makes 2–5 Kibana/ES calls for live data; reference data and the overview's
+  Defend sweep are cached (see [ARCHITECTURE.md](ARCHITECTURE.md#load-on-elastic)).
 - Run 1–2 replicas per tenant; the app is stateless apart from the login limiter.
 - Watch Kibana load if there are many tenants.
 
@@ -90,8 +92,7 @@
 ## Recommended next steps
 
 1. Add OIDC (see Authentication above).
-2. Add a short-lived cache for the overview, facets and status counts.
-3. Verify memory signature alerts from a real host (see
+2. Verify memory signature alerts from a real host (see
    [ELASTIC.md](ELASTIC.md#still-to-verify)).
-4. Optionally add read-only views of endpoint policy and exclusions, behind the same
+3. Optionally add read-only views of endpoint policy and exclusions, behind the same
    scoping.

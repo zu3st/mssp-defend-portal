@@ -78,9 +78,10 @@ The tests cover each layer:
 ## Authentication
 
 - **Built in:** local users (scrypt hashes) from a secrets file. Failed logins are limited
-  per client IP (20 per minute) and at most four password checks run at once; accounts are
-  never locked. The session is a stateless signed cookie (`HttpOnly`, `SameSite=Strict`,
-  `Secure` unless disabled for testing over plain HTTP).
+  per client IP (20 per minute) and at most four password checks run at once. The session
+  is a stateless signed cookie (`HttpOnly`, `SameSite=Strict`, `Secure` unless disabled for
+  testing over plain HTTP). Removing a user from the configuration ends their sessions on
+  the next request.
 - **Production:** replace the login with OIDC/SAML, either in-app or behind an
   authenticating reverse proxy. Map an IdP group or claim to _this_ container's tenant and
   reject users without it. The tenant still comes from the container configuration. See
@@ -100,6 +101,28 @@ The tests cover each layer:
   refresh reloads data in place and waits while the tab is hidden or the user is busy (alert
   flyout, an open dropdown or menu, typing).
 - `range`, `tz` and `theme` are display preferences; the server validates each before use.
+
+## Load on Elastic
+
+Live data is never cached, so Refresh always shows the current state: agent lists, status
+counts, agent details, alert searches and aggregations. Slow-changing data is kept in memory
+per container (`src/lib/server/cache.ts`):
+
+| Data                                                          | Kept for | Why                                             |
+| ------------------------------------------------------------- | -------- | ----------------------------------------------- |
+| Overview Elastic Defend counts and "Agents needing attention" | 30 s     | Reads every agent (up to 5,000) in pages of 500 |
+| Version and tag filter options                                | 5 min    | One Fleet request per distinct version          |
+| Agent policy names                                            | 5 min    | Renamed rarely                                  |
+| Detection rule names                                          | 5 min    | Renamed rarely                                  |
+| Versions Fleet can upgrade to                                 | 1 h      | Change with Elastic releases                    |
+
+- **Shared loads.** Requests for an entry that is still loading wait for that load, so
+  several tabs refreshing at once cost one sweep.
+- **Failures are not kept**, except for the two best-effort lookups (rule names, upgrade
+  versions), which are retried after a minute instead of on every page.
+- **Bounded.** Rule names are looked up at most four at a time, and the Defend sweep asks
+  Fleet for no CPU/memory metrics because it does not show them.
+- Cached responses still pass the tenant checks on every request.
 
 ## Normalization rules
 

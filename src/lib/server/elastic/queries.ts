@@ -1,7 +1,6 @@
 /**
- * Pure builders for Fleet KQL and Elasticsearch query DSL. Tenant scope is
- * always ANDed in here; request-derived values are only ever used as escaped
- * literals, never as query syntax.
+ * Pure builders for Fleet KQL and Elasticsearch query DSL. Each one ANDs in the
+ * tenant scope and uses request values only as escaped literals.
  */
 import type {
 	AgentQuery,
@@ -35,6 +34,18 @@ export function agentPolicyKuery(scope: TenantScope): string {
 	return kqlAnyOf('policy_id', scope.agentPolicyIds);
 }
 
+const VERSION_FIELD = 'local_metadata.elastic.agent.version';
+
+/**
+ * The tenant's agents that report a version other than `seen`. Asking for one
+ * such agent at a time lists the distinct versions in (versions + 1) requests.
+ */
+export function unseenVersionKuery(scope: TenantScope, seen: string[]): string {
+	const parts = [agentPolicyKuery(scope), `${VERSION_FIELD}:*`];
+	if (seen.length) parts.push(`not ${kqlAnyOf(VERSION_FIELD, seen)}`);
+	return parts.map((p) => `(${p})`).join(' and ');
+}
+
 export function agentKuery(
 	scope: TenantScope,
 	q: Pick<AgentQuery, 'search' | 'statuses' | 'versions' | 'policyIds' | 'tags'>
@@ -42,7 +53,7 @@ export function agentKuery(
 	const parts = [agentPolicyKuery(scope)];
 	if (q.policyIds?.length) parts.push(kqlAnyOf('policy_id', q.policyIds));
 	if (q.statuses?.length) parts.push(`status:(${q.statuses.join(' or ')})`);
-	if (q.versions?.length) parts.push(kqlAnyOf('local_metadata.elastic.agent.version', q.versions));
+	if (q.versions?.length) parts.push(kqlAnyOf(VERSION_FIELD, q.versions));
 	if (q.tags?.length) parts.push(kqlAnyOf('tags', q.tags));
 	if (q.search) {
 		const s = kqlEscapeWildcard(q.search);

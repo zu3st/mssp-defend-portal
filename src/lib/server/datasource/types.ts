@@ -27,7 +27,12 @@ import type {
 export interface DataSource {
 	readonly kind: 'mock' | 'elastic';
 
-	listAgents(scope: TenantScope, q: AgentQuery): Promise<RawFleetAgentList>;
+	/** `metrics: false` skips CPU/memory, for callers that do not show them. */
+	listAgents(
+		scope: TenantScope,
+		q: AgentQuery,
+		opts?: { metrics?: boolean }
+	): Promise<RawFleetAgentList>;
 	getAgent(scope: TenantScope, agentId: string): Promise<RawFleetAgent | null>;
 	agentStatus(scope: TenantScope): Promise<RawFleetAgentStatus>;
 	agentPolicies(scope: TenantScope): Promise<RawAgentPolicy[]>;
@@ -68,7 +73,7 @@ export interface AlertAggregates {
 	recentHighPriority: RawAlertHit[];
 }
 
-/** Hard limits that bound every query regardless of request input. */
+/** Hard limits on every query. */
 export const LIMITS = {
 	maxPageSize: 100,
 	/** Elasticsearch `index.max_result_window` default. */

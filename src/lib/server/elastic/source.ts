@@ -8,7 +8,8 @@ import type {
 } from '#lib/contract.ts';
 import type { ElasticConfig, TenantScope } from '../config';
 import type { AlertAggregates, AlertSearchResult, DataSource } from '../datasource/types';
-import { ReadOnlyElasticClient } from './http';
+import { concurrency, TtlCache } from '../cache';
+import { ElasticUnavailableError, ReadOnlyElasticClient } from './http';
 import {
 	agentKuery,
 	agentPolicyKuery,
@@ -18,7 +19,8 @@ import {
 	alertSearchBody,
 	FLEET_SORT_FIELDS,
 	kqlAnyOf,
-	ruleIdsBody
+	ruleIdsBody,
+	unseenVersionKuery
 } from './queries';
 import type {
 	RawAgentPolicy,
@@ -39,6 +41,30 @@ interface Terms {
 	buckets: Bucket[];
 }
 
+const MINUTE = 60_000;
+/**
+ * How long reference data is reused. Live data (agent lists, status counts,
+ * alerts) is never cached, so "Refresh" always shows the current state.
+ */
+const TTL = {
+	/** Policy names: renamed rarely. */
+	policies: 5 * MINUTE,
+	/** Versions Fleet can upgrade to: change with Elastic releases. */
+	versions: 60 * MINUTE,
+	/** Version and tag filter options: change on upgrades and retagging. */
+	facets: 5 * MINUTE,
+	/** Detection rule names: renamed rarely. */
+	ruleNames: 5 * MINUTE,
+	/** Best-effort lookups that failed are retried after this. */
+	failedLookup: MINUTE
+};
+
+/** Upper bound on distinct agent versions listed in the version filter. */
+const MAX_VERSIONS = 50;
+
+/** Cache key prefix per tenant scope. */
+const scopeKey = (s: TenantScope) => `${s.id}|${s.spaceId}|${s.agentPolicyIds.join(',')}`;
+
 /**
  * Real data source: Kibana Fleet + Endpoint APIs (space-scoped URLs) for
  * agents, and the space's alerts-as-data alias for detections. Authenticates
@@ -47,12 +73,9 @@ interface Terms {
 export class ElasticDataSource implements DataSource {
 	readonly kind = 'elastic' as const;
 	private client: ReadOnlyElasticClient;
-	private ruleNameCache = new Map<string, { at: number; name?: string }>();
-	private facetCache?: {
-		at: number;
-		scopeKey: string;
-		values: { versions: string[]; tags: string[] };
-	};
+	private cache = new TtlCache();
+	/** A detections page can name up to 200 rules; look them up a few at a time. */
+	private ruleLookups = concurrency(4);
 
 	constructor(cfg: ElasticConfig) {
 		this.client = new ReadOnlyElasticClient(cfg);
@@ -62,7 +85,11 @@ export class ElasticDataSource implements DataSource {
 		return scope.spaceId === 'default' ? '' : `/s/${scope.spaceId}`;
 	}
 
-	async listAgents(scope: TenantScope, q: AgentQuery): Promise<RawFleetAgentList> {
+	async listAgents(
+		scope: TenantScope,
+		q: AgentQuery,
+		{ metrics = true } = {}
+	): Promise<RawFleetAgentList> {
 		const res = await this.client.kibanaGet<RawFleetAgentList>(
 			`${this.space(scope)}/api/fleet/agents`,
 			{
@@ -74,7 +101,8 @@ export class ElasticDataSource implements DataSource {
 				showInactive: true,
 				showAgentless: false,
 				showUpgradeable: q.upgradeAvailable || undefined,
-				withMetrics: true
+				// CPU/memory cost Fleet an extra metrics query; only lists that show them ask.
+				withMetrics: metrics || undefined
 			}
 		);
 		return res ?? { items: [], total: 0, page: q.page, perPage: q.pageSize };
@@ -83,73 +111,83 @@ export class ElasticDataSource implements DataSource {
 	async getAgent(scope: TenantScope, agentId: string): Promise<RawFleetAgent | null> {
 		if (!/^[A-Za-z0-9-]{1,64}$/.test(agentId)) return null;
 		// withMetrics: Fleet only includes CPU/memory when asked (as in the list call).
-		const res = await this.client.kibanaGet<{ item: RawFleetAgent } | null>(
+		const res = await this.client.kibanaGet<{ item: RawFleetAgent }>(
 			`${this.space(scope)}/api/fleet/agents/${agentId}`,
 			{ withMetrics: true }
 		);
-		// The service layer re-checks the policy; returning it here is safe.
+		// Portal checks the agent's policy.
 		return res?.item ?? null;
 	}
 
 	async agentStatus(scope: TenantScope): Promise<RawFleetAgentStatus> {
-		return this.client.kibanaGet<RawFleetAgentStatus>(
+		const res = await this.client.kibanaGet<RawFleetAgentStatus>(
 			`${this.space(scope)}/api/fleet/agent_status`,
 			{
 				kuery: agentPolicyKuery(scope)
 			}
 		);
+		// Counts always exist; a 404 means a missing space, not an empty fleet.
+		if (!res) throw new ElasticUnavailableError('kibana agent_status not found', 404);
+		return res;
 	}
 
-	async agentPolicies(scope: TenantScope): Promise<RawAgentPolicy[]> {
-		const res = await this.client.kibanaGet<{ items: RawAgentPolicy[] }>(
-			`${this.space(scope)}/api/fleet/agent_policies`,
-			// No kuery: its saved-object field name differs between Fleet versions
-			// (space-aware Fleet matches nothing on `ingest-agent-policies.id`).
-			// The space-scoped list is filtered to the tenant's policies below.
-			{ perPage: 100, full: false }
-		);
-		return (res?.items ?? []).filter((p) => scope.agentPolicyIds.includes(p.id));
+	agentPolicies(scope: TenantScope): Promise<RawAgentPolicy[]> {
+		return this.cache.get(`policies|${scopeKey(scope)}`, TTL.policies, async () => {
+			const res = await this.client.kibanaGet<{ items: RawAgentPolicy[] }>(
+				`${this.space(scope)}/api/fleet/agent_policies`,
+				// No kuery: its saved-object field name differs between Fleet versions
+				// (space-aware Fleet matches nothing on `ingest-agent-policies.id`).
+				// The space-scoped list is filtered to the tenant's policies below.
+				{ perPage: 100, full: false }
+			);
+			return (res?.items ?? []).filter((p) => scope.agentPolicyIds.includes(p.id));
+		});
+	}
+
+	/** Version and tag filter options. Tags come from Fleet's tags API (a terms aggregation). */
+	agentFacetValues(scope: TenantScope): Promise<{ versions: string[]; tags: string[] }> {
+		return this.cache.get(`facets|${scopeKey(scope)}`, TTL.facets, async () => {
+			const [versions, tags] = await Promise.all([
+				this.agentVersions(scope),
+				this.client.kibanaGet<{ items: string[] }>(`${this.space(scope)}/api/fleet/agents/tags`, {
+					kuery: agentPolicyKuery(scope),
+					showInactive: true
+				})
+			]);
+			return { versions, tags: tags?.items ?? [] };
+		});
 	}
 
 	/**
-	 * Fleet has no "distinct versions" API, so page through the tenant's agents
-	 * (bounded) and cache the result briefly. Tags come from Fleet's tags API.
+	 * Distinct agent versions. Fleet's API has no aggregation for them, so ask for
+	 * one agent with a version not seen yet until none is left: one small request
+	 * per version.
 	 */
-	async agentFacetValues(scope: TenantScope): Promise<{ versions: string[]; tags: string[] }> {
-		const scopeKey = scope.agentPolicyIds.join(',');
-		if (
-			this.facetCache &&
-			this.facetCache.scopeKey === scopeKey &&
-			Date.now() - this.facetCache.at < 60_000
-		) {
-			return this.facetCache.values;
+	private async agentVersions(scope: TenantScope): Promise<string[]> {
+		const versions: string[] = [];
+		while (versions.length < MAX_VERSIONS) {
+			const res = await this.client.kibanaGet<RawFleetAgentList>(
+				`${this.space(scope)}/api/fleet/agents`,
+				{
+					kuery: unseenVersionKuery(scope, versions),
+					perPage: 1,
+					showInactive: true,
+					showAgentless: false,
+					sortField: FLEET_SORT_FIELDS.agentVersion,
+					sortOrder: 'desc'
+				}
+			);
+			const v = res?.items[0]?.local_metadata?.elastic?.agent?.version;
+			// A repeat would mean Fleet ignored the filter: stop rather than loop.
+			if (!v || versions.includes(v)) break;
+			versions.push(v);
 		}
-		const versions = new Set<string>();
-		for (let page = 1; page <= 5; page++) {
-			const res = await this.listAgents(scope, {
-				sort: 'hostname',
-				dir: 'asc',
-				page,
-				pageSize: 1000
-			} as AgentQuery);
-			for (const a of res.items) {
-				const v = a.local_metadata?.elastic?.agent?.version;
-				if (v) versions.add(v);
-			}
-			if (page * 1000 >= res.total) break;
-		}
-		const tags = await this.client.kibanaGet<{ items: string[] } | null>(
-			`${this.space(scope)}/api/fleet/agents/tags`,
-			{ kuery: agentPolicyKuery(scope), showInactive: true }
-		);
-		const values = { versions: [...versions], tags: tags?.items ?? [] };
-		this.facetCache = { at: Date.now(), scopeKey, values };
-		return values;
+		return versions;
 	}
 
 	async agentStatusSummary(scope: TenantScope, q: AgentQuery) {
 		// NOTE: verify `getStatusSummary` on the lab version (Fleet 8.16+).
-		const res = await this.client.kibanaGet<RawFleetAgentList | null>(
+		const res = await this.client.kibanaGet<RawFleetAgentList>(
 			`${this.space(scope)}/api/fleet/agents`,
 			{
 				kuery: agentKuery(scope, { ...q, statuses: undefined }),
@@ -163,12 +201,19 @@ export class ElasticDataSource implements DataSource {
 		return res?.statusSummary ?? {};
 	}
 
-	async availableVersions(scope: TenantScope): Promise<string[]> {
-		// Space-scoped path: the tenant API key only has privileges in its own space.
-		const res = await this.client.kibanaGet<{ items: string[] } | null>(
-			`${this.space(scope)}/api/fleet/agents/available_versions`
+	availableVersions(scope: TenantScope): Promise<string[]> {
+		return this.cache.get(
+			`versions|${scopeKey(scope)}`,
+			TTL.versions,
+			async () => {
+				// Space-scoped path: the tenant API key only has privileges in its own space.
+				const res = await this.client.kibanaGet<{ items: string[] }>(
+					`${this.space(scope)}/api/fleet/agents/available_versions`
+				);
+				return res?.items ?? [];
+			},
+			TTL.failedLookup
 		);
-		return res?.items ?? [];
 	}
 
 	async endpointMetadata(scope: TenantScope, agentIds: string[]) {
@@ -186,7 +231,7 @@ export class ElasticDataSource implements DataSource {
 	}
 
 	async searchAlerts(scope: TenantScope, q: AlertQuery): Promise<AlertSearchResult> {
-		const res = await this.client.esSearch<RawSearchResponse | null>(
+		const res = await this.client.esSearch<RawSearchResponse>(
 			scope.alertsIndex,
 			alertSearchBody(scope, q)
 		);
@@ -204,20 +249,23 @@ export class ElasticDataSource implements DataSource {
 	 */
 	async detectionRuleName(scope: TenantScope, ruleUuid: string): Promise<string | undefined> {
 		if (!/^[A-Za-z0-9-]{1,64}$/.test(ruleUuid)) return undefined;
-		const key = `${scope.spaceId}|${ruleUuid}`;
-		const hit = this.ruleNameCache.get(key);
-		if (hit && Date.now() - hit.at < 300_000) return hit.name;
-		const rule = await this.client.kibanaGet<{ name?: string } | null>(
-			`${this.space(scope)}/api/detection_engine/rules`,
-			{ id: ruleUuid }
+		return this.cache.get(
+			`rule|${scope.spaceId}|${ruleUuid}`,
+			TTL.ruleNames,
+			() =>
+				this.ruleLookups(async () => {
+					const rule = await this.client.kibanaGet<{ name?: string }>(
+						`${this.space(scope)}/api/detection_engine/rules`,
+						{ id: ruleUuid }
+					);
+					return rule?.name;
+				}),
+			TTL.failedLookup
 		);
-		this.ruleNameCache.set(key, { at: Date.now(), name: rule?.name });
-		if (this.ruleNameCache.size > 1000) this.ruleNameCache.clear();
-		return rule?.name;
 	}
 
 	async getAlert(scope: TenantScope, alertId: string): Promise<RawAlertHit | null> {
-		const res = await this.client.esSearch<RawSearchResponse | null>(
+		const res = await this.client.esSearch<RawSearchResponse>(
 			scope.alertsIndex,
 			alertByIdBody(scope, alertId)
 		);
@@ -231,7 +279,7 @@ export class ElasticDataSource implements DataSource {
 			active: { severity: Terms; recent: { top: { hits: { hits: RawAlertHit[] } } } };
 			prevented: { doc_count: number };
 		};
-		const res = await this.client.esSearch<RawSearchResponse<Aggs> | null>(
+		const res = await this.client.esSearch<RawSearchResponse<Aggs>>(
 			scope.alertsIndex,
 			alertAggregatesBody(scope, range)
 		);
@@ -245,7 +293,7 @@ export class ElasticDataSource implements DataSource {
 		const out = new Map<string, AlertCounts>();
 		if (agentIds.length === 0) return out;
 		type Aggs = { agents: { buckets: (Bucket & { status: Terms })[] } };
-		const res = await this.client.esSearch<RawSearchResponse<Aggs> | null>(
+		const res = await this.client.esSearch<RawSearchResponse<Aggs>>(
 			scope.alertsIndex,
 			alertCountsByAgentBody(scope, agentIds)
 		);
@@ -258,7 +306,7 @@ export class ElasticDataSource implements DataSource {
 	}
 
 	async alertRuleIds(scope: TenantScope, range: TimeRange): Promise<string[]> {
-		const res = await this.client.esSearch<RawSearchResponse<{ rules: Terms }> | null>(
+		const res = await this.client.esSearch<RawSearchResponse<{ rules: Terms }>>(
 			scope.alertsIndex,
 			ruleIdsBody(scope, range)
 		);
@@ -266,7 +314,9 @@ export class ElasticDataSource implements DataSource {
 	}
 
 	async ping(): Promise<void> {
-		await this.client.kibanaGet('/api/status');
+		// A 404 here means a wrong KIBANA_URL, not a ready Kibana.
+		if (!(await this.client.kibanaGet('/api/status')))
+			throw new ElasticUnavailableError('kibana /api/status not found', 404);
 	}
 }
 

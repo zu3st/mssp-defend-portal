@@ -3,7 +3,7 @@
  * exactly this shape (see `Messages`). Strings with numbers or names are
  * functions, so each language can order words and form plurals its own way.
  * Text that comes from Elastic (rule names, reasons, agent messages, field
- * names) is shown as it is and never passes through here.
+ * names) is shown as it is.
  */
 const plural = (n: number, one: string, other: string) => (n === 1 ? one : other);
 

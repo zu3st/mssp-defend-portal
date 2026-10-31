@@ -6,8 +6,7 @@ import type { ElasticConfig } from '../config';
  * Uses Node's built-in `fetch` instead of `@elastic/elasticsearch`: we need
  * only `_search`, which keeps us independent of client/server major-version
  * coupling and adds no dependency. Every request is checked against an
- * allowlist of read-only endpoints before it is sent; there is no code path
- * that can issue a write.
+ * allowlist of read-only endpoints before it is sent.
  *
  * TLS: for a lab CA, set NODE_EXTRA_CA_CERTS=/path/to/ca.crt (Node built-in).
  */
@@ -69,11 +68,11 @@ export class ReadOnlyElasticClient {
 	async kibanaGet<T>(
 		path: string,
 		params?: Record<string, string | number | boolean | undefined>
-	): Promise<T> {
+	): Promise<T | null> {
 		return this.request<T>('kibana', 'GET', path, params);
 	}
 
-	async esSearch<T>(index: string, body: unknown): Promise<T> {
+	async esSearch<T>(index: string, body: unknown): Promise<T | null> {
 		return this.request<T>('es', 'POST', `/${index}/_search`, { ignore_unavailable: true }, body);
 	}
 
@@ -83,9 +82,9 @@ export class ReadOnlyElasticClient {
 		path: string,
 		params?: Record<string, string | number | boolean | undefined>,
 		body?: unknown
-	): Promise<T> {
+	): Promise<T | null> {
 		if (!isAllowed(target, method, path)) {
-			// Programming error, never user input: refuse rather than send.
+			// Only a programming error gets here: refuse to send.
 			throw new Error(`Refusing non-allowlisted Elastic request: ${method} ${target}${path}`);
 		}
 		const base = target === 'kibana' ? this.cfg.kibanaUrl : this.cfg.elasticsearchUrl;
@@ -113,8 +112,8 @@ export class ReadOnlyElasticClient {
 			throw new ElasticUnavailableError(`${target} unreachable: ${(e as Error).message}`);
 		}
 		if (res.status === 404) {
-			// Callers treat 404 as "not found in this tenant"
-			return null as T;
+			// Callers treat 404 as "not found in this tenant".
+			return null;
 		}
 		if (!res.ok) {
 			// Do not propagate the body: it may contain internal details.

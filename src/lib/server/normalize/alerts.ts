@@ -119,8 +119,7 @@ const BASE_FIELDS = [
 
 /**
  * `_source` allowlist requested from Elasticsearch: the base fields plus every
- * highlighted field. Anything not listed never leaves the cluster, so it cannot
- * reach the browser by accident.
+ * highlighted field. Only these fields leave the cluster.
  */
 export const ALERT_SOURCE_FIELDS: readonly string[] = [
 	...new Set([...BASE_FIELDS, ...COMMON_HIGHLIGHTED, ...Object.values(HIGHLIGHTED_BY_KIND).flat()])

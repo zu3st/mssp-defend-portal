@@ -95,7 +95,7 @@ export function isSameOrigin(request: Request, origins: string[]): boolean {
 
 /**
  * In-memory login throttle (per container): failed logins per client IP within a
- * window, and a cap on password checks running at once. Accounts are never locked.
+ * window, and a cap on password checks running at once.
  */
 export class LoginRateLimiter {
 	private attempts = new Map<string, { count: number; first: number }>();

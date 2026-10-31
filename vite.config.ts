@@ -16,7 +16,7 @@ export default defineConfig({
 			// The per-container public origin is only known at runtime (ORIGIN env),
 			// so the same-origin check for POSTs is enforced in hooks.server.ts.
 			csrf: { trustedOrigins: ['*'] },
-			// Browser may only talk to this origin; Elastic is never reachable from it.
+			// The browser may only talk to this origin.
 			csp: {
 				mode: 'auto',
 				directives: {

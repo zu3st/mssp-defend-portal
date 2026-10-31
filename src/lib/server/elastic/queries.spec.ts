@@ -9,7 +9,8 @@ import {
 	alertSearchBody,
 	kqlEscapeWildcard,
 	kqlQuote,
-	ruleIdsBody
+	ruleIdsBody,
+	unseenVersionKuery
 } from './queries';
 
 const scope: TenantScope = {
@@ -44,6 +45,15 @@ describe('KQL', () => {
 		expect(k).toContain('(policy_id:("acme-servers"))');
 		expect(k).toContain('status:(online)');
 		expect(k).toContain('local_metadata.host.hostname:*ws*');
+	});
+
+	it('asks for versions not seen yet, within the tenant', () => {
+		expect(unseenVersionKuery(scope, [])).toBe(
+			'(policy_id:("acme-workstations" or "acme-servers")) and (local_metadata.elastic.agent.version:*)'
+		);
+		expect(unseenVersionKuery(scope, ['9.5.5', '9.4.0'])).toBe(
+			'(policy_id:("acme-workstations" or "acme-servers")) and (local_metadata.elastic.agent.version:*) and (not local_metadata.elastic.agent.version:("9.5.5" or "9.4.0"))'
+		);
 	});
 
 	it('an injected "or" in search cannot widen the scope', () => {

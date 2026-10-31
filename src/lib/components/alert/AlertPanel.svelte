@@ -11,7 +11,7 @@
 	 * header (severity, time, rule name), Status / Risk score / Assignees
 	 * cards, About, and Investigation → Highlighted fields. Read-only: no Take
 	 * action, notes, Table or JSON tabs. Data is the portal's normalized,
-	 * allowlisted alert detail, never a raw Elastic document.
+	 * allowlisted alert detail.
 	 */
 	let { alertId, onclose }: { alertId: string | null; onclose: () => void } = $props();
 

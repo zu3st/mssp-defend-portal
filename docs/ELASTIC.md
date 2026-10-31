@@ -10,18 +10,26 @@ All access is read-only and uses the container's tenant-specific API key
 | Agent list / search / sort / page  | `GET /s/<space>/api/fleet/agents?kuery=…&page=&perPage=&sortField=&sortOrder=&showInactive=true&withMetrics=true[&showUpgradeable=true]` | `policy_id:(tenant policies)` ANDed                  |
 | Status summary bar                 | same, `perPage=1&getStatusSummary=true`, status filter removed                                                                           | policy kuery                                         |
 | Tags filter options                | `GET /s/<space>/api/fleet/agents/tags?kuery=policy_id:(…)`                                                                               | policy kuery                                         |
-| Upgrade available                  | `GET /api/fleet/agents/available_versions`                                                                                               | – (version list only)                                |
+| Version filter options             | same, `perPage=1&sortField=local_metadata.elastic.agent.version.keyword&kuery=… and not local_metadata.elastic.agent.version:(seen)`     | policy kuery                                         |
+| Upgrade available                  | `GET /s/<space>/api/fleet/agents/available_versions` (cached 1 h)                                                                        | – (version list only)                                |
 | Detection rule name for the flyout | `GET /s/<space>/api/detection_engine/rules?id=<kibana.alert.rule.uuid>` (cached 5 min)                                                   | space-scoped                                         |
 | Agent detail                       | `GET /s/<space>/api/fleet/agents/<id>`                                                                                                   | policy re-checked; foreign → 404                     |
 | Status counts                      | `GET /s/<space>/api/fleet/agent_status?kuery=policy_id:(…)`                                                                              | policy kuery                                         |
-| Policy names                       | `GET /s/<space>/api/fleet/agent_policies?kuery=ingest-agent-policies.id:(…)`                                                             | result filtered to tenant ids                        |
+| Policy names                       | `GET /s/<space>/api/fleet/agent_policies?perPage=100` (cached 5 min)                                                                     | result filtered to tenant ids                        |
 | Defend policy response / isolation | `GET /s/<space>/api/endpoint/metadata?kuery=…`                                                                                           | policy + agent ids of the current page               |
 | Alerts list, detail, aggregations  | `POST /.alerts-security.alerts-<space>/_search`                                                                                          | `kibana.space_ids` + `data_stream.namespace` filters |
 | Readiness                          | `GET /api/status`                                                                                                                        | –                                                    |
 
 Fleet already calculates and normalizes agent status. Using its API avoids reading the
 internal `.fleet-*` indices. The Endpoint metadata API supplies what Fleet does not: the
-endpoint policy response and isolation state.
+endpoint policy response and isolation state. Only lists that show CPU and memory ask for
+`withMetrics`; the overview's Defend sweep leaves it out. What is cached, and for how long,
+is in [ARCHITECTURE.md](ARCHITECTURE.md#load-on-elastic).
+
+Fleet's agents API has no aggregation for distinct versions (the Fleet UI has no version
+dropdown; its search box suggests values from the internal `.fleet-agents` index). The
+portal asks for one agent with a version it has not seen yet, newest first, until none is
+left: one `perPage=1` request per version plus one, at most 50 versions.
 
 Pagination is server-side everywhere:
 

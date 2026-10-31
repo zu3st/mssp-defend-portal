@@ -1,7 +1,7 @@
 /**
  * Strict parsing of browser query parameters into bounded query objects.
- * Unknown values are dropped, sizes clamped, dates validated. Nothing here
- * carries authorization: tenant scope is applied separately by `Portal`.
+ * Unknown values are dropped, sizes clamped, dates validated. Tenant scope is
+ * applied separately by `Portal`.
  */
 import type {
 	AgentQuery,
